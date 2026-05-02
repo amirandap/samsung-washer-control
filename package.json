@@ -5,10 +5,18 @@
   "scripts": {
     "dev": "concurrently -n vite,api -c cyan,yellow \"vite\" \"node --env-file=.env server/index.js\"",
     "build": "vite build",
+    "build:prod": "VITE_BASE_PATH=/lavadora/ vite build",
     "preview": "node --env-file=.env server/index.js",
     "server": "node --env-file=.env server/index.js",
     "mcp": "node --env-file=.env server/mcp.js",
-    "mcp:http": "MCP_HTTP=1 node --env-file=.env server/mcp.js"
+    "mcp:http": "MCP_HTTP=1 node --env-file=.env server/mcp.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "src/**/*.{js,jsx}": ["eslint --fix"],
+    "server/**/*.js": ["eslint --fix"]
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.0",
@@ -20,8 +28,15 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^4.3.0",
     "concurrently": "^8.2.0",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "vite": "^5.4.0"
   }
 }

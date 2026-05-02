@@ -194,6 +194,15 @@ export function deletePreset(id) {
   return true;
 }
 
+export function reorderPresets(items) {
+  const reorder = db.transaction(() => {
+    for (const { id, sort_order } of items) {
+      presetQueries.reorder.run({ id, sort_order });
+    }
+  });
+  reorder();
+}
+
 export function recordHistory(presetId, presetName) {
   historyQueries.add.run(presetId, presetName);
 }

@@ -17,7 +17,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import {
-  listPresets, getPreset, createPreset, updatePreset, deletePreset,
+  listPresets, getPreset, createPreset, updatePreset, deletePreset, reorderPresets,
   getConfig, setConfig, getHistory, recordHistory,
   listClothing, listClothingByPreset, getClothingItem,
   createClothingItem, updateClothingItem, deleteClothingItem,
@@ -77,8 +77,13 @@ server.tool(
     spin_rpm:  z.number().int().describe('Spin speed in RPM (600, 800, 1000, 1200)'),
     eco:       z.boolean().optional().default(true).describe('Enable EcoBubble'),
     color:     z.string().optional().describe('Badge hex color, e.g. "#9b59b6"'),
-    notes:     z.string().optional().describe('Private notes or optimization rationale'),
-    sort_order:z.number().int().optional().describe('Display order (lower = first)'),
+    notes:      z.string().optional().describe('Private notes or optimization rationale'),
+    sort_order: z.number().int().optional().describe('Display order (lower = first)'),
+    clothes:    z.string().optional().describe('Free-text clothes description for this preset'),
+    compat_colors: z.string().optional().describe('JSON array of compatible color names, e.g. \'["negro","azul"]\''),
+    dry_cycle:  z.string().optional().describe('Dryer cycle key, e.g. "normal", "delicates"'),
+    dry_temp:   z.string().optional().describe('Dryer temperature, e.g. "low", "medium"'),
+    dry_notes:  z.string().optional().describe('Notes about drying this preset'),
   },
   async (data) => {
     const preset = createPreset(data);
@@ -97,9 +102,14 @@ server.tool(
     temp:      z.string().optional(),
     spin_rpm:  z.number().int().optional(),
     eco:       z.boolean().optional(),
-    color:     z.string().optional(),
-    notes:     z.string().optional(),
-    sort_order:z.number().int().optional(),
+    color:      z.string().optional(),
+    notes:      z.string().optional(),
+    sort_order: z.number().int().optional(),
+    clothes:    z.string().optional().describe('Free-text clothes description'),
+    compat_colors: z.string().optional().describe('JSON array of compatible colors'),
+    dry_cycle:  z.string().optional(),
+    dry_temp:   z.string().optional(),
+    dry_notes:  z.string().optional(),
   },
   async ({ id, ...fields }) => {
     const updated = updatePreset(id, fields);
@@ -290,6 +300,7 @@ server.tool(
   {
     brand:      z.string().describe('Brand name, e.g. "Zara", "Nike", "H&M"'),
     name:       z.string().describe('Item description, e.g. "Camiseta negra manga larga"'),
+    item_type:  z.string().optional().describe('Type of garment, e.g. "camiseta", "pantalón", "calcetines"'),
     colors:     z.array(z.string()).describe('Color(s) of the garment, e.g. ["negro", "gris"]'),
     fabric:     z.string().describe('Fabric composition from label, e.g. "100% algodón", "60% poliéster 40% algodón"'),
     care_temp:  z.string().optional().describe('Max wash temperature from label, e.g. "30", "40", "60"'),
@@ -322,6 +333,7 @@ server.tool(
     id:         z.string().describe('Clothing item ID'),
     brand:      z.string().optional(),
     name:       z.string().optional(),
+    item_type:  z.string().optional().describe('Type of garment, e.g. "camiseta", "pantalón"'),
     colors:     z.array(z.string()).optional(),
     fabric:     z.string().optional(),
     care_temp:  z.string().optional(),
@@ -403,6 +415,23 @@ server.tool(
   'List clothing items that have not been assigned to any preset yet',
   {},
   async () => text(listUnassignedClothing())
+);
+
+server.tool(
+  'reorder_presets',
+  'Update the display order of presets. Pass an array of {id, sort_order} objects.',
+  {
+    items: z.array(
+      z.object({
+        id:         z.string().describe('Preset ID'),
+        sort_order: z.number().int().describe('New sort position (0 = first)'),
+      })
+    ).describe('List of presets with their new sort positions'),
+  },
+  async ({ items }) => {
+    reorderPresets(items);
+    return text(`Reordered ${items.length} preset(s).`);
+  }
 );
 
 // ════════════════════════════════════════════════════

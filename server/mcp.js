@@ -408,5 +408,28 @@ server.tool(
 // ════════════════════════════════════════════════════
 //  START
 // ════════════════════════════════════════════════════
-const transport = new StdioServerTransport();
-await server.connect(transport);
+// ════════════════════════════════════════════════════
+//  START — stdio (default) or HTTP (MCP_HTTP=1)
+// ════════════════════════════════════════════════════
+if (process.env.MCP_HTTP === '1') {
+  const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+  const express = (await import('express')).default;
+  const app = express();
+  app.use(express.json());
+
+  const PORT = process.env.MCP_PORT || 3002;
+
+  app.all('/mcp', async (req, res) => {
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on('close', () => transport.close());
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  });
+
+  app.listen(PORT, '127.0.0.1', () =>
+    console.log(`MCP HTTP server listening on http://127.0.0.1:${PORT}/mcp`)
+  );
+} else {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}

@@ -1,8 +1,11 @@
 // All fetch calls go to the Express backend at /api/*
 // In dev, Vite proxies /api → http://localhost:3001
+// In production, BASE_URL is e.g. /lavadora/ so API calls go to /lavadora/api/*
+
+const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, '/');
 
 const req = async (method, path, body) => {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,

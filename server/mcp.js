@@ -455,8 +455,8 @@ if (process.env.MCP_HTTP === '1') {
     await transport.handleRequest(req, res, req.body);
   });
 
-  app.listen(PORT, '127.0.0.1', () =>
-    console.log(`MCP HTTP server listening on http://127.0.0.1:${PORT}/mcp`)
+  app.listen(PORT, process.env.MCP_HOST || '127.0.0.1', () =>
+    console.log(`MCP HTTP server listening on http://${process.env.MCP_HOST || '127.0.0.1'}:${PORT}/mcp`)
   );
 } else {
   const transport = new StdioServerTransport();

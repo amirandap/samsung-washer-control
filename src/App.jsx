@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api.js';
-import SetupPanel   from './components/SetupPanel.jsx';
-import StatusCard   from './components/StatusCard.jsx';
-import PresetGrid   from './components/PresetGrid.jsx';
-import PresetEditor from './components/PresetEditor.jsx';
-import ApplyModal   from './components/ApplyModal.jsx';
-import Toast        from './components/Toast.jsx';
+import SetupPanel      from './components/SetupPanel.jsx';
+import StatusCard      from './components/StatusCard.jsx';
+import PresetGrid      from './components/PresetGrid.jsx';
+import PresetEditor    from './components/PresetEditor.jsx';
+import ApplyModal      from './components/ApplyModal.jsx';
+import WashDoneModal   from './components/WashDoneModal.jsx';
+import Toast           from './components/Toast.jsx';
 
 export default function App() {
   // ── Config state ─────────────────────────────────
@@ -82,6 +83,31 @@ export default function App() {
     };
   }, [configured, fetchStatus]);
 
+  // ── Wash-done modal ────────────────────────────────
+  const [washDone, setWashDone] = useState(null);   // { presetId, presetName }
+  const lastWasherState = useRef(null);
+  const lastAppliedPreset = useRef(null); // { id, name } of the last confirmed preset
+
+  // Detect running → finished transition
+  useEffect(() => {
+    if (!status) return;
+    const main = status?.components?.main ?? {};
+    const state = main['washerOperatingState']?.washerJobState?.value
+      ?? main['washerOperatingState']?.machineState?.value ?? 'unknown';
+    const s = state.toLowerCase();
+    const isRunning = s.includes('run') || s.includes('wash') || s.includes('spin') || s.includes('rinse');
+    const isFinished = s.includes('end') || s.includes('finish') || s.includes('stop');
+    const prev = lastWasherState.current;
+    lastWasherState.current = s;
+    if (prev && !prev.includes('unknown') && isFinished) {
+      const wasRunning = prev.includes('run') || prev.includes('wash') || prev.includes('spin') || prev.includes('rinse');
+      if (wasRunning && lastAppliedPreset.current) {
+        setWashDone(lastAppliedPreset.current);
+      }
+    }
+    void isRunning; // suppress unused warning
+  }, [status]);
+
   // ── Apply preset ──────────────────────────────────
   const [applyTarget, setApplyTarget] = useState(null); // preset pending confirmation
 
@@ -93,6 +119,7 @@ export default function App() {
     const preset = applyTarget;
     setApplyTarget(null);
     setApplying(preset.id);
+    lastAppliedPreset.current = { presetId: preset.id, presetName: preset.name };
     try {
       await api.applyPreset(preset.id);
       showToast(`✅ "${preset.name}" enviado — usa ${ml} ml de detergente (${lbs} lbs). Presiona START.`, 'success');
@@ -202,6 +229,14 @@ export default function App() {
           preset={applyTarget}
           onConfirm={confirmApply}
           onClose={() => setApplyTarget(null)}
+        />
+      )}
+
+      {washDone && (
+        <WashDoneModal
+          presetId={washDone.presetId}
+          presetName={washDone.presetName}
+          onClose={() => setWashDone(null)}
         />
       )}
 

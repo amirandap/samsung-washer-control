@@ -475,6 +475,20 @@ input[type="color"] { padding: 3px 4px; height: 36px; width: 36px; cursor: point
 .det-hints { margin: 0; padding: 0 0 0 4px; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .det-hints li { font-size: .77rem; color: var(--muted); }
 
+/* Care instructions block in ApplyModal */
+.care-instructions-block {
+  background: #2d1f0a;
+  border: 1px solid #7c4d0a;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.care-instructions-title { font-size: .82rem; font-weight: 700; color: #f0a832; }
+.care-instructions-list  { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.care-instructions-list li { display: flex; flex-direction: column; gap: 1px; }
+.care-item-name { font-size: .78rem; font-weight: 600; color: var(--text); }
+.care-item-note { font-size: .76rem; color: #e09428; }
+
 /* Fields */
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field label { font-size: .8rem; color: var(--muted); }

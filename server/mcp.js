@@ -303,10 +303,11 @@ server.tool(
     item_type:  z.string().optional().describe('Type of garment, e.g. "camiseta", "pantalón", "calcetines"'),
     colors:     z.array(z.string()).describe('Color(s) of the garment, e.g. ["negro", "gris"]'),
     fabric:     z.string().describe('Fabric composition from label, e.g. "100% algodón", "60% poliéster 40% algodón"'),
-    care_temp:  z.string().optional().describe('Max wash temperature from label, e.g. "30", "40", "60"'),
-    care_cycle: z.string().optional().describe('Recommended wash cycle, e.g. "delicates", "normal", "synthetics"'),
-    preset_id:  z.string().optional().describe('Preset ID to assign immediately (if known)'),
-    notes:      z.string().optional().describe('Extra notes, e.g. "no centrifugar", "lavar del revés"'),
+    care_temp:         z.string().optional().describe('Max wash temperature from label, e.g. "30", "40", "60"'),
+    care_cycle:        z.string().optional().describe('Recommended wash cycle, e.g. "delicates", "normal", "synthetics"'),
+    care_instructions: z.string().optional().describe('Specific care warnings shown at wash time, e.g. "No secar en secadora", "Lavar del revés", "No centrifugar"'),
+    preset_id:         z.string().optional().describe('Preset ID to assign immediately (if known)'),
+    notes:             z.string().optional().describe('Private notes or extra context'),
   },
   async (data) => {
     const item = createClothingItem({
@@ -336,10 +337,11 @@ server.tool(
     item_type:  z.string().optional().describe('Type of garment, e.g. "camiseta", "pantalón"'),
     colors:     z.array(z.string()).optional(),
     fabric:     z.string().optional(),
-    care_temp:  z.string().optional(),
-    care_cycle: z.string().optional(),
-    preset_id:  z.string().nullable().optional(),
-    notes:      z.string().optional(),
+    care_temp:         z.string().optional(),
+    care_cycle:        z.string().optional(),
+    care_instructions: z.string().optional().describe('Specific care warnings shown at wash time'),
+    preset_id:         z.string().nullable().optional(),
+    notes:             z.string().optional(),
   },
   async ({ id, colors, ...rest }) => {
     const data = { ...rest };

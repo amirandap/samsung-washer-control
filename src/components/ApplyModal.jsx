@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { api } from '../api.js';
 
 const LBS_TO_KG = 0.453592;
 
@@ -36,11 +37,18 @@ function DetergentBar({ ml, max = 150 }) {
 
 export default function ApplyModal({ preset, onConfirm, onClose }) {
   const [lbs, setLbs] = useState('');
+  const [careItems, setCareItems] = useState([]);
   const inputRef = useRef(null);
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
+
+  useEffect(() => {
+    api.listPresetClothing(preset.id)
+      .then(items => setCareItems(items.filter(i => i.care_instructions?.trim())))
+      .catch(() => {});
+  }, [preset.id]);
 
   const kg   = lbs !== '' ? parseFloat(lbs) * LBS_TO_KG : null;
   const ml   = kg !== null ? calcDetergent(kg, preset) : null;
@@ -112,8 +120,21 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
             </div>
           )}
 
+          {careItems.length > 0 && (
+            <div className="care-instructions-block">
+              <div className="care-instructions-title">⚠️ Instrucciones de cuidado</div>
+              <ul className="care-instructions-list">
+                {careItems.map(item => (
+                  <li key={item.id}>
+                    <span className="care-item-name">{item.brand} {item.name}</span>
+                    <span className="care-item-note">{item.care_instructions}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="modal-footer">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
             <button
               type="submit"
               className="btn btn-primary"

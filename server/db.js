@@ -50,18 +50,20 @@ try { db.exec(`ALTER TABLE presets ADD COLUMN dry_temp TEXT NOT NULL DEFAULT ''`
 try { db.exec(`ALTER TABLE presets ADD COLUMN dry_notes TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 
 try { db.exec(`ALTER TABLE clothing_items ADD COLUMN item_type TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE clothing_items ADD COLUMN care_instructions TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 db.exec(`
   CREATE TABLE IF NOT EXISTS clothing_items (
-    id         TEXT PRIMARY KEY,
-    brand      TEXT NOT NULL DEFAULT '',
-    name       TEXT NOT NULL DEFAULT '',
-    colors     TEXT NOT NULL DEFAULT '[]',
-    fabric     TEXT NOT NULL DEFAULT '',
-    care_temp  TEXT NOT NULL DEFAULT '',
-    care_cycle TEXT NOT NULL DEFAULT '',
-    preset_id  TEXT DEFAULT NULL,
-    notes      TEXT DEFAULT '',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    id                 TEXT PRIMARY KEY,
+    brand              TEXT NOT NULL DEFAULT '',
+    name               TEXT NOT NULL DEFAULT '',
+    colors             TEXT NOT NULL DEFAULT '[]',
+    fabric             TEXT NOT NULL DEFAULT '',
+    care_temp          TEXT NOT NULL DEFAULT '',
+    care_cycle         TEXT NOT NULL DEFAULT '',
+    care_instructions  TEXT NOT NULL DEFAULT '',
+    preset_id          TEXT DEFAULT NULL,
+    notes              TEXT DEFAULT '',
+    created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -217,13 +219,14 @@ const clothingQueries = {
   listByPreset:  db.prepare('SELECT * FROM clothing_items WHERE preset_id = ? ORDER BY brand, name'),
   get:           db.prepare('SELECT * FROM clothing_items WHERE id = ?'),
   create:        db.prepare(`
-    INSERT INTO clothing_items (id, brand, name, item_type, colors, fabric, care_temp, care_cycle, preset_id, notes)
-    VALUES (@id, @brand, @name, @item_type, @colors, @fabric, @care_temp, @care_cycle, @preset_id, @notes)
+    INSERT INTO clothing_items (id, brand, name, item_type, colors, fabric, care_temp, care_cycle, care_instructions, preset_id, notes)
+    VALUES (@id, @brand, @name, @item_type, @colors, @fabric, @care_temp, @care_cycle, @care_instructions, @preset_id, @notes)
   `),
   update:        db.prepare(`
     UPDATE clothing_items
     SET brand = @brand, name = @name, item_type = @item_type, colors = @colors, fabric = @fabric,
-        care_temp = @care_temp, care_cycle = @care_cycle, preset_id = @preset_id, notes = @notes
+        care_temp = @care_temp, care_cycle = @care_cycle, care_instructions = @care_instructions,
+        preset_id = @preset_id, notes = @notes
     WHERE id = @id
   `),
   delete:        db.prepare('DELETE FROM clothing_items WHERE id = ?'),
@@ -247,15 +250,16 @@ export function createClothingItem(data) {
   const id = data.id || `cloth_${Date.now()}`;
   clothingQueries.create.run({
     id,
-    brand:      data.brand      ?? '',
-    name:       data.name       ?? '',
-    item_type:  data.item_type  ?? '',
-    colors:     data.colors     ?? '[]',
-    fabric:     data.fabric     ?? '',
-    care_temp:  data.care_temp  ?? '',
-    care_cycle: data.care_cycle ?? '',
-    preset_id:  data.preset_id  ?? null,
-    notes:      data.notes      ?? '',
+    brand:             data.brand             ?? '',
+    name:              data.name              ?? '',
+    item_type:         data.item_type         ?? '',
+    colors:            data.colors            ?? '[]',
+    fabric:            data.fabric            ?? '',
+    care_temp:         data.care_temp         ?? '',
+    care_cycle:        data.care_cycle        ?? '',
+    care_instructions: data.care_instructions ?? '',
+    preset_id:         data.preset_id         ?? null,
+    notes:             data.notes             ?? '',
   });
   return getClothingItem(id);
 }
@@ -265,15 +269,16 @@ export function updateClothingItem(id, data) {
   if (!existing) return null;
   clothingQueries.update.run({
     id,
-    brand:      data.brand      ?? existing.brand,
-    name:       data.name       ?? existing.name,
-    item_type:  data.item_type  !== undefined ? data.item_type : existing.item_type,
-    colors:     data.colors     !== undefined ? data.colors : existing.colors,
-    fabric:     data.fabric     ?? existing.fabric,
-    care_temp:  data.care_temp  ?? existing.care_temp,
-    care_cycle: data.care_cycle ?? existing.care_cycle,
-    preset_id:  data.preset_id  !== undefined ? data.preset_id : existing.preset_id,
-    notes:      data.notes      ?? existing.notes,
+    brand:             data.brand             ?? existing.brand,
+    name:              data.name              ?? existing.name,
+    item_type:         data.item_type         !== undefined ? data.item_type : existing.item_type,
+    colors:            data.colors            !== undefined ? data.colors : existing.colors,
+    fabric:            data.fabric            ?? existing.fabric,
+    care_temp:         data.care_temp         ?? existing.care_temp,
+    care_cycle:        data.care_cycle        ?? existing.care_cycle,
+    care_instructions: data.care_instructions !== undefined ? data.care_instructions : (existing.care_instructions ?? ''),
+    preset_id:         data.preset_id         !== undefined ? data.preset_id : existing.preset_id,
+    notes:             data.notes             ?? existing.notes,
   });
   return getClothingItem(id);
 }

@@ -23,3 +23,4 @@ jobs:
             npm install --include=dev
             npm run build
             pm2 restart washer-api
+            pm2 restart washer-mcp

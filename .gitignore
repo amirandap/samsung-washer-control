@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables — never commit real credentials
+.env
+
+# SQLite database (contains token & deviceId at runtime)
+data/
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# One-off migration scripts
+seed_presets.mjs

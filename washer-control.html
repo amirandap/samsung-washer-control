@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartThings — Washer Control</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e8eaf0;
+    --text-muted: #7b82a0;
+    --accent: #4f8ef7;
+    --success: #2ecc71;
+    --warn: #f39c12;
+    --danger: #e74c3c;
+    --radius: 14px;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: var(--text);
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  header .title-group { display: flex; align-items: center; gap: 10px; }
+  header .title-group .icon { font-size: 1.6rem; }
+
+  /* ── Setup panel ── */
+  #setup-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    max-width: 480px;
+    margin: 60px auto;
+  }
+  #setup-panel h2 { font-size: 1.1rem; margin-bottom: 6px; }
+  #setup-panel p  { color: var(--text-muted); font-size: .88rem; margin-bottom: 20px; line-height: 1.5; }
+
+  label { display: block; font-size: .85rem; color: var(--text-muted); margin-bottom: 6px; }
+
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: .95rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+    margin-bottom: 14px;
+    font-family: inherit;
+  }
+  input[type="text"]:focus, input[type="password"]:focus { border-color: var(--accent); }
+
+  button {
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .92rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    transition: opacity .15s, transform .1s;
+  }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost   { background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-size: .82rem; padding: 6px 14px; }
+  .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* ── Main app ── */
+  #app { display: none; max-width: 640px; margin: 0 auto; }
+
+  /* Status card */
+  #status-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+  }
+  #status-card .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  #status-card .row:last-child { margin-bottom: 0; }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .82rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 100px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .badge-idle    { background: #2e3350; color: #7b82a0; }
+  .badge-running { background: #0d3b2e; color: #2ecc71; }
+  .badge-paused  { background: #3b2e0d; color: #f39c12; }
+  .badge-end     { background: #1a2e3b; color: #4f8ef7; }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .stat-item { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+  .stat-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .stat-value { font-size: 1rem; font-weight: 600; }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot-green  { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .dot-grey   { background: var(--text-muted); }
+  .dot-pulse  {
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .refresh-info { font-size: .75rem; color: var(--text-muted); }
+
+  /* ── Presets ── */
+  #presets-section h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: 12px; }
+
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 420px) { .presets-grid { grid-template-columns: 1fr; } }
+
+  .preset-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    cursor: pointer;
+    transition: border-color .2s, transform .15s, background .2s;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .preset-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .preset-card:hover  { border-color: #4a5080; transform: translateY(-2px); background: var(--surface2); }
+  .preset-card:active { transform: translateY(0); }
+  .preset-card.sending { opacity: .6; pointer-events: none; }
+
+  .preset-badge {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+  }
+  .preset-name  { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+  .preset-sub   { font-size: .78rem; color: var(--text-muted); margin-bottom: 12px; }
+  .preset-details { display: flex; flex-direction: column; gap: 4px; }
+  .preset-detail {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .8rem;
+    color: var(--text-muted);
+  }
+  .preset-detail .icon { font-size: .85rem; width: 16px; text-align: center; }
+  .preset-detail .val  { color: var(--text); font-weight: 500; }
+
+  /* colors per preset */
+  .p1::before { background: #e74c3c; }
+  .p1 .preset-badge { background: #e74c3c; }
+  .p2::before { background: #2471a3; }
+  .p2 .preset-badge { background: #2471a3; }
+  .p3::before { background: #95a5a6; }
+  .p3 .preset-badge { background: #95a5a6; }
+  .p4::before { background: #c9a84c; }
+  .p4 .preset-badge { background: #c9a84c; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: .9rem;
+    font-weight: 500;
+    max-width: 360px;
+    width: calc(100% - 32px);
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s, transform .25s;
+    z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  #toast.toast-success { border-color: var(--success); color: var(--success); }
+  #toast.toast-warn    { border-color: var(--warn); color: var(--warn); }
+  #toast.toast-error   { border-color: var(--danger); color: var(--danger); }
+  #toast.toast-info    { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Warning inline ── */
+  .inline-warn {
+    background: #2e200a;
+    border: 1px solid var(--warn);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: .85rem;
+    color: var(--warn);
+    margin-top: 14px;
+    line-height: 1.5;
+    display: none;
+  }
+
+  /* misc */
+  .sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .text-muted { color: var(--text-muted); font-size: .82rem; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════
+     SETUP PANEL
+════════════════════════════════════════════════ -->
+<div id="setup-panel">
+  <h2>🫧 SmartThings Washer</h2>
+  <p>Ingresa tu Personal Access Token de SmartThings para conectarte al dispositivo.</p>
+
+  <label for="token-input">Personal Access Token</label>
+  <input type="password" id="token-input" placeholder="Pega aquí tu token…" autocomplete="off" spellcheck="false">
+
+  <label for="device-input">Device ID <span style="color:#4a5080">(opcional — se detecta automáticamente)</span></label>
+  <input type="text" id="device-input" placeholder="Dejar vacío para auto-detectar" autocomplete="off" spellcheck="false">
+
+  <div id="setup-error" class="inline-warn" style="display:none; margin-bottom:14px;"></div>
+
+  <button class="btn-primary" id="connect-btn" onclick="handleConnect()" style="width:100%">Conectar</button>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     MAIN APP
+════════════════════════════════════════════════ -->
+<div id="app">
+  <header>
+    <div class="title-group">
+      <span class="icon">🫧</span>
+      <div>
+        <h1>Washer Control</h1>
+        <div class="text-muted" id="device-name-label">—</div>
+      </div>
+    </div>
+    <button class="btn-ghost" onclick="showSetup()">Cambiar token</button>
+  </header>
+
+  <!-- Status card -->
+  <div id="status-card">
+    <div class="row">
+      <div>
+        <span id="status-badge" class="status-badge badge-idle">
+          <span class="dot dot-grey"></span> Cargando…
+        </span>
+      </div>
+      <div class="refresh-info" id="next-refresh-label">actualizando…</div>
+    </div>
+    <div class="status-grid">
+      <div class="stat-item"><div class="stat-label">Ciclo</div><div class="stat-value" id="stat-cycle">—</div></div>
+      <div class="stat-item"><div class="stat-label">Temperatura</div><div class="stat-value" id="stat-temp">—</div></div>
+      <div class="stat-item"><div class="stat-label">Centrifugado</div><div class="stat-value" id="stat-spin">—</div></div>
+      <div class="stat-item"><div class="stat-label">Tiempo restante</div><div class="stat-value" id="stat-time">—</div></div>
+      <div class="stat-item"><div class="stat-label">Smart Control</div><div class="stat-value" id="stat-remote">—</div></div>
+      <div class="stat-item"><div class="stat-label">EcoBubble</div><div class="stat-value" id="stat-eco">—</div></div>
+    </div>
+  </div>
+
+  <div id="remote-warn" class="inline-warn">
+    ⚠️ Activa Smart Control en la lavadora primero, luego presiona de nuevo.
+  </div>
+
+  <hr class="sep">
+
+  <!-- Presets -->
+  <section id="presets-section">
+    <h2>Presets de lavado</h2>
+    <div class="presets-grid">
+
+      <!-- P1 -->
+      <div class="preset-card p1" id="card-p1" onclick="applyPreset('p1')">
+        <span class="preset-badge"></span>
+        <div class="preset-name">P1 — Columbia</div>
+        <div class="preset-sub">Delicado</div>
+        <div class="preset-details">
+          <div class="preset-detail"><span class="icon">🔄</span><span>Ciclo</span><span class="val">Delicates</span></div>
+          <div class="preset-detail"><span class="icon">🌡️</span><span>Temp</span><span class="val">30 °C</span></div>
+          <div class="preset-detail"><span class="icon">💨</span><span>Spin</span><span class="val">600 rpm</span></div>
+          <div class="preset-detail"><span class="icon">🫧</span><span>EcoBubble</span><span class="val">On</span></div>
+        </div>
+      </div>
+
+      <!-- P2 -->
+      <div class="preset-card p2" id="card-p2" onclick="applyPreset('p2')">
+        <span class="preset-badge"></span>
+        <div class="preset-name">P2 — Oscuros</div>
+        <div class="preset-sub">Colores</div>
+        <div class="preset-details">
+          <div class="preset-detail"><span class="icon">🔄</span><span>Ciclo</span><span class="val">Colors</span></div>
+          <div class="preset-detail"><span class="icon">🌡️</span><span>Temp</span><span class="val">30 °C</span></div>
+          <div class="preset-detail"><span class="icon">💨</span><span>Spin</span><span class="val">1000 rpm</span></div>
+          <div class="preset-detail"><span class="icon">🫧</span><span>EcoBubble</span><span class="val">On</span></div>
+        </div>
+      </div>
+
+      <!-- P3 -->
+      <div class="preset-card p3" id="card-p3" onclick="applyPreset('p3')">
+        <span class="preset-badge"></span>
+        <div class="preset-name">P3 — Claros</div>
+        <div class="preset-sub">Normal</div>
+        <div class="preset-details">
+          <div class="preset-detail"><span class="icon">🔄</span><span>Ciclo</span><span class="val">Normal</span></div>
+          <div class="preset-detail"><span class="icon">🌡️</span><span>Temp</span><span class="val">30 °C</span></div>
+          <div class="preset-detail"><span class="icon">💨</span><span>Spin</span><span class="val">1000 rpm</span></div>
+          <div class="preset-detail"><span class="icon">🫧</span><span>EcoBubble</span><span class="val">On</span></div>
+        </div>
+      </div>
+
+      <!-- P4 -->
+      <div class="preset-card p4" id="card-p4" onclick="applyPreset('p4')">
+        <span class="preset-badge"></span>
+        <div class="preset-name">P4 — Pasteles</div>
+        <div class="preset-sub">Camisas / Tibio</div>
+        <div class="preset-details">
+          <div class="preset-detail"><span class="icon">🔄</span><span>Ciclo</span><span class="val">Cottons</span></div>
+          <div class="preset-detail"><span class="icon">🌡️</span><span>Temp</span><span class="val">40 °C</span></div>
+          <div class="preset-detail"><span class="icon">💨</span><span>Spin</span><span class="val">1000 rpm</span></div>
+          <div class="preset-detail"><span class="icon">🫧</span><span>EcoBubble</span><span class="val">On</span></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  CONFIG & STATE
+// ═══════════════════════════════════════════════════
+const API = 'https://api.smartthings.com/v1';
+
+// Spin level mapping by RPM target — will be resolved from device capabilities
+const SPIN_RPM_HINTS = {
+  600:  ['rinseHold', 'low', 'no'],
+  800:  ['medium'],
+  1000: ['high'],
+  1200: ['extraHigh'],
+};
+
+const PRESETS = {
+  p1: { name: 'Columbia (Delicado)', cycle: 'delicates', temp: 'cold',  spinRpm: 600,  eco: true },
+  p2: { name: 'Oscuros (Colores)',   cycle: 'colors',    temp: 'cold',  spinRpm: 1000, eco: true },
+  p3: { name: 'Claros (Normal)',     cycle: 'normal',    temp: 'cold',  spinRpm: 1000, eco: true },
+  p4: { name: 'Pasteles (Camisas)',  cycle: 'cottons',   temp: 'warm',  spinRpm: 1000, eco: true },
+};
+
+let token    = '';
+let deviceId = '';
+let deviceLabel = '';
+let spinLevels  = null;   // discovered from device
+let refreshTimer = null;
+let countdownTimer = null;
+let nextRefreshIn  = 30;
+
+// ═══════════════════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════════════════
+function saveState() {
+  localStorage.setItem('st_token',    token);
+  localStorage.setItem('st_deviceId', deviceId);
+  localStorage.setItem('st_label',    deviceLabel);
+}
+
+function loadState() {
+  token       = localStorage.getItem('st_token')    || '';
+  deviceId    = localStorage.getItem('st_deviceId') || '';
+  deviceLabel = localStorage.getItem('st_label')    || '';
+}
+
+// ═══════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════
+function showApp() {
+  document.getElementById('setup-panel').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('device-name-label').textContent = deviceLabel || deviceId;
+}
+
+function showSetup() {
+  clearInterval(refreshTimer);
+  clearInterval(countdownTimer);
+  document.getElementById('setup-panel').style.display = 'block';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('token-input').value = token;
+  document.getElementById('device-input').value = deviceId;
+}
+
+let toastTimeout;
+function toast(msg, type = 'info', duration = 4000) {
+  const el = document.getElementById('toast');
+  el.className = `show toast-${type}`;
+  el.innerHTML = msg;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => { el.className = ''; }, duration);
+}
+
+function setConnectBtn(loading) {
+  const btn = document.getElementById('connect-btn');
+  btn.disabled = loading;
+  btn.innerHTML = loading ? '<span class="spinner"></span>Conectando…' : 'Conectar';
+}
+
+function showSetupError(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearSetupError() {
+  document.getElementById('setup-error').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════
+//  API HELPERS
+// ═══════════════════════════════════════════════════
+async function apiFetch(path, opts = {}) {
+  if (!navigator.onLine) throw new Error('NO_INTERNET');
+  const res = await fetch(`${API}${path}`, {
+    ...opts,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (res.status === 401) throw new Error('UNAUTHORIZED');
+  if (res.status === 403) throw new Error('FORBIDDEN');
+  if (res.status === 422 || res.status >= 500) throw new Error('SERVER_ERROR');
+  if (!res.ok) throw new Error(`HTTP_${res.status}`);
+  return res.json();
+}
+
+function handleApiError(err) {
+  if (err.message === 'NO_INTERNET')   return 'No hay internet.';
+  if (err.message === 'UNAUTHORIZED')  return '🔑 Token inválido. Ingresa uno nuevo.';
+  if (err.message === 'FORBIDDEN')     return '🚫 Remote Control no habilitado en la máquina.';
+  if (err.message === 'SERVER_ERROR')  return '⚠️ Error enviando comando. Intenta de nuevo.';
+  return `Error: ${err.message}`;
+}
+
+// ═══════════════════════════════════════════════════
+//  CONNECT FLOW
+// ═══════════════════════════════════════════════════
+async function handleConnect() {
+  clearSetupError();
+  const inputToken  = document.getElementById('token-input').value.trim();
+  const inputDevice = document.getElementById('device-input').value.trim();
+
+  if (!inputToken) { showSetupError('El token no puede estar vacío.'); return; }
+
+  token    = inputToken;
+  deviceId = inputDevice;
+
+  setConnectBtn(true);
+  try {
+    if (!deviceId) {
+      deviceId = await autoDiscoverDevice();
+    } else {
+      // validate by fetching device info
+      const info = await apiFetch(`/devices/${deviceId}`);
+      deviceLabel = info.label || info.name || deviceId;
+    }
+    saveState();
+    showApp();
+    await discoverSpinLevels();
+    startPolling();
+  } catch (err) {
+    if (err.message === 'UNAUTHORIZED') {
+      showSetupError('Token inválido. Verifica e intenta de nuevo.');
+    } else if (err.message === 'NO_DEVICE') {
+      showSetupError('No se encontró una lavadora/secadora en tu cuenta. Ingresa el Device ID manualmente.');
+    } else {
+      showSetupError(handleApiError(err));
+    }
+  } finally {
+    setConnectBtn(false);
+  }
+}
+
+async function autoDiscoverDevice() {
+  const data = await apiFetch('/devices?capability=custom.washerWashCourse');
+  if (data.items && data.items.length > 0) {
+    const dev = data.items[0];
+    deviceLabel = dev.label || dev.name || dev.deviceId;
+    return dev.deviceId;
+  }
+  // fallback: search without capability filter
+  const all = await apiFetch('/devices');
+  const washer = (all.items || []).find(d => {
+    const cat = (d.components || []).flatMap(c => c.categories || []).map(c => c.name?.toLowerCase() || '');
+    const name = (d.label || d.name || '').toLowerCase();
+    return cat.some(c => c.includes('wash') || c.includes('dryer')) ||
+           name.includes('wash') || name.includes('dryer') || name.includes('laund');
+  });
+  if (washer) {
+    deviceLabel = washer.label || washer.name || washer.deviceId;
+    return washer.deviceId;
+  }
+  throw new Error('NO_DEVICE');
+}
+
+// ═══════════════════════════════════════════════════
+//  SPIN LEVEL DISCOVERY
+// ═══════════════════════════════════════════════════
+async function discoverSpinLevels() {
+  try {
+    const data = await apiFetch(
+      `/devices/${deviceId}/components/main/capabilities/custom.washerSpinLevel/status`
+    );
+    // The status returns the current value and sometimes supportedValues or enum
+    // Try to get the capability definition for supported values
+    const capDef = await apiFetch(
+      `/devices/${deviceId}/components/main/capabilities/custom.washerSpinLevel`
+    ).catch(() => null);
+
+    if (capDef) {
+      // Extract enum values from capability definition
+      const cmd = (capDef.commands || {}).setWasherSpinLevel;
+      const args = cmd?.arguments || [];
+      const enumVals = args[0]?.schema?.enum || args[0]?.schema?.properties?.value?.enum || null;
+      if (enumVals && enumVals.length > 0) {
+        spinLevels = enumVals;
+        return;
+      }
+    }
+    // Fallback: use known values from device status
+    const currentVal = data.washerSpinLevel?.value;
+    if (currentVal) spinLevels = [currentVal];
+  } catch (_) {
+    // silently fail, will use defaults
+  }
+}
+
+function resolveSpinCommand(rpm) {
+  const hints = SPIN_RPM_HINTS[rpm] || ['high'];
+  if (spinLevels && spinLevels.length > 0) {
+    for (const h of hints) {
+      if (spinLevels.includes(h)) return h;
+    }
+    // best effort: pick a value positionally
+    const levels = [...spinLevels];
+    if (rpm <= 600)  return levels[0];
+    if (rpm >= 1200) return levels[levels.length - 1];
+    const mid = Math.floor(levels.length / 2);
+    return levels[mid];
+  }
+  return hints[0];
+}
+
+// ═══════════════════════════════════════════════════
+//  STATUS POLLING
+// ═══════════════════════════════════════════════════
+function startPolling() {
+  fetchStatus();
+  nextRefreshIn = 30;
+
+  clearInterval(refreshTimer);
+  clearInterval(countdownTimer);
+
+  refreshTimer = setInterval(() => {
+    fetchStatus();
+    nextRefreshIn = 30;
+  }, 30000);
+
+  countdownTimer = setInterval(() => {
+    nextRefreshIn--;
+    document.getElementById('next-refresh-label').textContent =
+      `próxima actualización en ${nextRefreshIn}s`;
+  }, 1000);
+}
+
+async function fetchStatus() {
+  try {
+    const data = await apiFetch(`/devices/${deviceId}/status`);
+    renderStatus(data);
+  } catch (err) {
+    if (err.message === 'UNAUTHORIZED') {
+      toast('🔑 Token expirado. Ingresa uno nuevo.', 'error', 6000);
+      showSetup();
+    }
+    // other errors: keep last status
+  }
+}
+
+function renderStatus(data) {
+  const main = data?.components?.main || {};
+
+  // Machine state
+  const machineState = main['samsungce.washerBubbleSoak']?.machineState?.value
+    || main['washerOperatingState']?.machineState?.value
+    || main['samsungce.deviceIdentification']?.modelName?.value
+    || '—';
+  const operationalState = main['washerOperatingState']?.washerJobState?.value || machineState;
+  const completionTime   = main['washerOperatingState']?.completionTime?.value || null;
+  const remoteEnabled    = main['remoteControlStatus']?.remoteControlEnabled?.value ?? null;
+  const cycle            = main['custom.washerWashCourse']?.washerWashCourse?.value || '—';
+  const temp             = main['custom.washerWashTemperature']?.washerWashTemperature?.value || '—';
+  const spin             = main['custom.washerSpinLevel']?.washerSpinLevel?.value || '—';
+  const eco              = main['samsungce.ecoBubble']?.ecoBubble?.value
+    ?? main['custom.washerBubbleSoak']?.washerBubbleSoak?.value ?? null;
+
+  // Badge
+  const badge = document.getElementById('status-badge');
+  let badgeClass = 'badge-idle', dotClass = 'dot dot-grey', stateLabel = 'Reposo';
+  const s = (operationalState || '').toLowerCase();
+  if (s.includes('run') || s.includes('wash') || s.includes('spin') || s.includes('rinse')) {
+    badgeClass = 'badge-running'; dotClass = 'dot dot-pulse'; stateLabel = 'En marcha';
+  } else if (s.includes('pause')) {
+    badgeClass = 'badge-paused'; dotClass = 'dot dot-grey'; stateLabel = 'Pausado';
+  } else if (s.includes('end') || s.includes('finish')) {
+    badgeClass = 'badge-end'; dotClass = 'dot dot-grey'; stateLabel = 'Terminado';
+  }
+  badge.className = `status-badge ${badgeClass}`;
+  badge.innerHTML = `<span class="${dotClass}"></span> ${stateLabel}`;
+
+  // Stats
+  document.getElementById('stat-cycle').textContent = cycle !== '—' ? capitalize(cycle) : '—';
+  document.getElementById('stat-temp').textContent  = tempLabel(temp);
+  document.getElementById('stat-spin').textContent  = spinLabel(spin);
+
+  let timeLeft = '—';
+  if (completionTime) {
+    const diff = new Date(completionTime) - new Date();
+    if (diff > 0) {
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      timeLeft = `${mins}m ${secs}s`;
+    } else {
+      timeLeft = 'Terminado';
+    }
+  }
+  document.getElementById('stat-time').textContent = timeLeft;
+  document.getElementById('stat-remote').innerHTML = remoteEnabled === true
+    ? '<span style="color:var(--success)">✔ Sí</span>'
+    : remoteEnabled === false
+      ? '<span style="color:var(--danger)">✘ No</span>'
+      : '—';
+  document.getElementById('stat-eco').textContent = eco === true || eco === 'on' ? '✔ On' : eco === false || eco === 'off' ? '✘ Off' : '—';
+}
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function tempLabel(v) {
+  const map = { cold: '30 °C (Frío)', warm: '40 °C (Tibio)', hot: '60 °C (Caliente)', extraHot: '90 °C' };
+  return map[v] || (v !== '—' ? capitalize(v) : '—');
+}
+
+function spinLabel(v) {
+  const map = { no: 'Sin centri.', rinseHold: '~600 rpm', low: '~600 rpm', medium: '800 rpm', high: '1000 rpm', extraHigh: '1200 rpm' };
+  return map[v] || (v !== '—' ? capitalize(v) : '—');
+}
+
+// ═══════════════════════════════════════════════════
+//  APPLY PRESET
+// ═══════════════════════════════════════════════════
+async function applyPreset(presetKey) {
+  const preset = PRESETS[presetKey];
+  const card   = document.getElementById(`card-${presetKey}`);
+  const warnEl = document.getElementById('remote-warn');
+  warnEl.style.display = 'none';
+
+  // Step 1: check remote control
+  let remoteEnabled = false;
+  try {
+    const rc = await apiFetch(
+      `/devices/${deviceId}/components/main/capabilities/remoteControlStatus/status`
+    );
+    remoteEnabled = rc?.remoteControlEnabled?.value === true;
+  } catch (err) {
+    toast(handleApiError(err), 'error');
+    return;
+  }
+
+  if (!remoteEnabled) {
+    warnEl.style.display = 'block';
+    warnEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+
+  // Start sending
+  card.classList.add('sending');
+  toast(`<span class="spinner"></span>Enviando preset <b>${preset.name}</b>…`, 'info', 15000);
+
+  try {
+    // Step 2: cycle
+    await sendCommand('custom.washerWashCourse', 'setWasherWashCourse', [preset.cycle]);
+
+    // Step 3: temperature
+    await sendCommand('custom.washerWashTemperature', 'setWasherWashTemperature', [preset.temp]);
+
+    // Step 4: spin
+    const spinCmd = resolveSpinCommand(preset.spinRpm);
+    await sendCommand('custom.washerSpinLevel', 'setWasherSpinLevel', [spinCmd]);
+
+    // Step 5: success
+    toast(`✅ Preset <b>${preset.name}</b> enviado.<br>Presiona START en la lavadora.`, 'success', 6000);
+    // refresh status
+    setTimeout(fetchStatus, 1500);
+
+  } catch (err) {
+    toast(handleApiError(err), 'error');
+    if (err.message === 'UNAUTHORIZED') showSetup();
+  } finally {
+    card.classList.remove('sending');
+  }
+}
+
+async function sendCommand(capability, command, args) {
+  return apiFetch(`/devices/${deviceId}/commands`, {
+    method: 'POST',
+    body: JSON.stringify({
+      commands: [{
+        component: 'main',
+        capability,
+        command,
+        arguments: args,
+      }],
+    }),
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+(function init() {
+  loadState();
+  if (token && deviceId) {
+    showApp();
+    discoverSpinLevels();
+    startPolling();
+  } else {
+    document.getElementById('setup-panel').style.display = 'block';
+    if (token) document.getElementById('token-input').value = token;
+    if (deviceId) document.getElementById('device-input').value = deviceId;
+  }
+})();
+</script>
+</body>
+</html>

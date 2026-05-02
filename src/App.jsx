@@ -1,0 +1,211 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { api } from './api.js';
+import SetupPanel   from './components/SetupPanel.jsx';
+import StatusCard   from './components/StatusCard.jsx';
+import PresetGrid   from './components/PresetGrid.jsx';
+import PresetEditor from './components/PresetEditor.jsx';
+import ApplyModal   from './components/ApplyModal.jsx';
+import Toast        from './components/Toast.jsx';
+
+export default function App() {
+  // ── Config state ─────────────────────────────────
+  const [configured, setConfigured] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+
+  // ── Status state ─────────────────────────────────
+  const [status, setStatus]   = useState(null);
+  const [statusErr, setStatusErr] = useState(null);
+  const [nextRefresh, setNextRefresh] = useState(30);
+
+  // ── Presets state ─────────────────────────────────
+  const [presets, setPresets]   = useState([]);
+  const [applying, setApplying] = useState(null); // preset id being applied
+
+  // ── Editor state ──────────────────────────────────
+  const [editorOpen,   setEditorOpen]   = useState(false);
+  const [editingPreset, setEditingPreset] = useState(null); // null = create
+
+  // ── Toast ─────────────────────────────────────────
+  const [toast, setToast] = useState(null); // { msg, type }
+
+  const showToast = useCallback((msg, type = 'info') => {
+    setToast({ msg, type, key: Date.now() });
+  }, []);
+
+  // ── Init ──────────────────────────────────────────
+  useEffect(() => {
+    api.getConfig().then(cfg => {
+      if (cfg.token && cfg.deviceId) setConfigured(true);
+    }).catch(() => {}).finally(() => setConfigLoading(false));
+  }, []);
+
+  // ── Load presets ──────────────────────────────────
+  const loadPresets = useCallback(() => {
+    api.listPresets().then(setPresets).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (configured) loadPresets();
+  }, [configured, loadPresets]);
+
+  // ── Status polling ─────────────────────────────────
+  const fetchStatus = useCallback(async () => {
+    try {
+      const data = await api.getStatus();
+      setStatus(data);
+      setStatusErr(null);
+    } catch (err) {
+      setStatusErr(err.message);
+      if (err.status === 401) {
+        showToast('🔑 Token expirado. Reconecta.', 'error');
+        setConfigured(false);
+      }
+    }
+    setNextRefresh(30);
+  }, [showToast]);
+
+  const refreshRef = useRef(null);
+  const countdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!configured) {
+      clearInterval(refreshRef.current);
+      clearInterval(countdownRef.current);
+      return;
+    }
+    fetchStatus();
+    refreshRef.current   = setInterval(fetchStatus, 30000);
+    countdownRef.current = setInterval(() => setNextRefresh(n => Math.max(0, n - 1)), 1000);
+    return () => {
+      clearInterval(refreshRef.current);
+      clearInterval(countdownRef.current);
+    };
+  }, [configured, fetchStatus]);
+
+  // ── Apply preset ──────────────────────────────────
+  const [applyTarget, setApplyTarget] = useState(null); // preset pending confirmation
+
+  const handleApply = useCallback((preset) => {
+    setApplyTarget(preset);
+  }, []);
+
+  const confirmApply = useCallback(async ({ lbs, kg, ml }) => {
+    const preset = applyTarget;
+    setApplyTarget(null);
+    setApplying(preset.id);
+    try {
+      await api.applyPreset(preset.id);
+      showToast(`✅ "${preset.name}" enviado — usa ${ml} ml de detergente (${lbs} lbs). Presiona START.`, 'success');
+      setTimeout(fetchStatus, 1500);
+    } catch (err) {
+      if (err.data?.error === 'REMOTE_DISABLED') {
+        showToast('⚠️ Activa Smart Control en la lavadora primero.', 'warn');
+      } else if (err.status === 401) {
+        showToast('🔑 Token inválido.', 'error');
+      } else {
+        showToast(`Error: ${err.message}`, 'error');
+      }
+    } finally {
+      setApplying(null);
+    }
+  }, [applyTarget, fetchStatus, showToast]);
+
+  // ── Editor ────────────────────────────────────────
+  const openCreate = () => { setEditingPreset(null); setEditorOpen(true); };
+  const openEdit   = (p) => { setEditingPreset(p);   setEditorOpen(true); };
+
+  const handleEditorSave = useCallback(async (data) => {
+    try {
+      if (editingPreset) {
+        await api.updatePreset(editingPreset.id, data);
+        showToast('Preset actualizado.', 'success');
+      } else {
+        await api.createPreset(data);
+        showToast('Preset creado.', 'success');
+      }
+      setEditorOpen(false);
+      loadPresets();
+    } catch (err) {
+      showToast(`Error guardando: ${err.message}`, 'error');
+    }
+  }, [editingPreset, loadPresets, showToast]);
+
+  const handleDelete = useCallback(async (preset) => {
+    if (!confirm(`¿Eliminar el preset "${preset.name}"?`)) return;
+    try {
+      await api.deletePreset(preset.id);
+      showToast(`Preset "${preset.name}" eliminado.`, 'info');
+      loadPresets();
+    } catch (err) {
+      showToast(`Error: ${err.message}`, 'error');
+    }
+  }, [loadPresets, showToast]);
+
+  // ── Render ────────────────────────────────────────
+  if (configLoading) {
+    return <div className="loading-screen"><span className="spinner-lg" /></div>;
+  }
+
+  if (!configured) {
+    return (
+      <>
+        <SetupPanel
+          onConnected={() => { setConfigured(true); }}
+          showToast={showToast}
+        />
+        <Toast toast={toast} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="app-layout">
+        <header className="app-header">
+          <div className="header-left">
+            <span className="header-icon">🫧</span>
+            <h1>Washer Control</h1>
+          </div>
+          <div className="header-right">
+            <StatusCard
+              status={status}
+              error={statusErr}
+              nextRefresh={nextRefresh}
+              onRefresh={fetchStatus}
+            />
+            <button className="btn btn-primary btn-sm" onClick={openCreate}>+ Nuevo</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setConfigured(false)}>
+              Cambiar token
+            </button>
+          </div>
+        </header>
+
+        <PresetGrid
+          presets={presets}
+          applying={applying}
+          onApply={handleApply}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+        />
+      </div>
+
+      {editorOpen && (
+        <PresetEditor
+          preset={editingPreset}
+          onSave={handleEditorSave}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
+
+      {applyTarget && (
+        <ApplyModal
+          preset={applyTarget}
+          onConfirm={confirmApply}
+          onClose={() => setApplyTarget(null)}
+        />
+      )}
+
+      <Toast toast={toast} />
+    </>
+  );
+}

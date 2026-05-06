@@ -1,20 +1,9 @@
-import { useEffect, useState } from 'react';
 import { COLOR_SWATCHES, parseCompatColors } from '../constants.js';
-import { api } from '../api.js';
 
-export default function PresetCard({ preset, isApplying, onApply, onEdit, onDelete }) {
+export default function PresetCard({ preset, clothing = [], isApplying, onApply, onEdit, onDelete }) {
   const compatColors = parseCompatColors(preset.compat_colors);
-  const [brands, setBrands] = useState([]);
-  const [itemTypes, setItemTypes] = useState([]);
-
-  useEffect(() => {
-    api.listPresetClothing(preset.id)
-      .then(items => {
-        setBrands([...new Set(items.map(i => i.brand).filter(Boolean))]);
-        setItemTypes([...new Set(items.map(i => i.item_type).filter(Boolean))]);
-      })
-      .catch(() => {});
-  }, [preset.id]);
+  const brands    = [...new Set(clothing.map(i => i.brand).filter(Boolean))];
+  const itemTypes = [...new Set(clothing.map(i => i.item_type).filter(Boolean))];
 
   return (
     <div

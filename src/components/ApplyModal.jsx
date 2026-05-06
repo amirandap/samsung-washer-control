@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { api } from '../api.js';
 
 const LBS_TO_KG = 0.453592;
 
@@ -35,20 +34,14 @@ function DetergentBar({ ml, max = 150 }) {
   );
 }
 
-export default function ApplyModal({ preset, onConfirm, onClose }) {
+export default function ApplyModal({ preset, clothing = [], onConfirm, onClose }) {
   const [lbs, setLbs] = useState('');
-  const [careItems, setCareItems] = useState([]);
+  const careItems = clothing.filter(i => i.care_instructions?.trim());
   const inputRef = useRef(null);
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
-
-  useEffect(() => {
-    api.listPresetClothing(preset.id)
-      .then(items => setCareItems(items.filter(i => i.care_instructions?.trim())))
-      .catch(() => {});
-  }, [preset.id]);
 
   const kg   = lbs !== '' ? parseFloat(lbs) * LBS_TO_KG : null;
   const ml   = kg !== null ? calcDetergent(kg, preset) : null;

@@ -20,8 +20,9 @@ export default function App() {
   const [nextRefresh, setNextRefresh] = useState(30);
 
   // ── Presets state ─────────────────────────────────
-  const [presets, setPresets]   = useState([]);
-  const [applying, setApplying] = useState(null); // preset id being applied
+  const [presets,   setPresets]   = useState([]);
+  const [clothing,  setClothing]  = useState([]); // all clothing items, loaded once
+  const [applying,  setApplying]  = useState(null); // preset id being applied
 
   // ── Editor state ──────────────────────────────────
   const [editorOpen,   setEditorOpen]   = useState(false);
@@ -62,9 +63,10 @@ export default function App() {
           return;
         }
 
-        // Load presets + status in parallel — app shows only when both are ready
-        const [presetsData, statusData] = await Promise.all([
+        // Load presets + clothing + status in parallel — app shows only when all ready
+        const [presetsData, clothingData, statusData] = await Promise.all([
           api.listPresets(),
+          api.listClothing().catch(() => []),
           api.getStatus().catch(err => {
             // 401 = token invalid; re-auth if OAuth, otherwise show setup
             if (err.status === 401) throw err;
@@ -75,6 +77,7 @@ export default function App() {
         ]);
 
         setPresets(presetsData);
+        setClothing(clothingData);
         if (statusData) setStatus(statusData);
         setConfigured(true);
       } catch (err) {
@@ -98,7 +101,9 @@ export default function App() {
 
   // ── Reload presets (used after create/edit/delete) ────────────
   const loadPresets = useCallback(() => {
-    api.listPresets().then(setPresets).catch(console.error);
+    Promise.all([api.listPresets(), api.listClothing().catch(() => [])])
+      .then(([p, c]) => { setPresets(p); setClothing(c); })
+      .catch(console.error);
   }, []);
 
   // ── Status polling ─────────────────────────────────
@@ -269,6 +274,7 @@ export default function App() {
 
         <PresetGrid
           presets={presets}
+          clothing={clothing}
           applying={applying}
           onApply={handleApply}
           onEdit={openEdit}
@@ -288,6 +294,7 @@ export default function App() {
       {applyTarget && (
         <ApplyModal
           preset={applyTarget}
+          clothing={clothing.filter(c => c.preset_id === applyTarget.id)}
           onConfirm={confirmApply}
           onClose={() => setApplyTarget(null)}
         />
@@ -297,6 +304,7 @@ export default function App() {
         <WashDoneModal
           presetId={washDone.presetId}
           presetName={washDone.presetName}
+          clothing={clothing.filter(c => c.preset_id === washDone.presetId)}
           onClose={() => setWashDone(null)}
         />
       )}

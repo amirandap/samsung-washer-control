@@ -1,20 +1,6 @@
-import { useState, useEffect } from 'react';
-import { api } from '../api.js';
-
-export default function WashDoneModal({ presetId, presetName, onClose }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!presetId) { setLoading(false); return; }
-    api.listPresetClothing(presetId)
-      .then(data => setItems(data))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
-  }, [presetId]);
-
-  const careItems = items.filter(i => i.care_instructions?.trim());
-  const otherItems = items.filter(i => !i.care_instructions?.trim());
+export default function WashDoneModal({ presetId, presetName, clothing = [], onClose }) {
+  const careItems  = clothing.filter(i => i.care_instructions?.trim());
+  const otherItems = clothing.filter(i => !i.care_instructions?.trim());
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -32,11 +18,7 @@ export default function WashDoneModal({ presetId, presetName, onClose }) {
           <button className="btn btn-ghost btn-xs icon-btn wash-done-close" onClick={onClose}>✕</button>
         </div>
 
-        {loading && (
-          <div className="wash-done-loading"><span className="spinner-sm" /></div>
-        )}
-
-        {!loading && careItems.length > 0 && (
+        {careItems.length > 0 && (
           <div className="wash-done-warnings">
             <p className="wash-done-warnings-title">⚠️ Instrucciones especiales de cuidado</p>
             <div className="wash-done-care-list">
@@ -57,7 +39,7 @@ export default function WashDoneModal({ presetId, presetName, onClose }) {
           </div>
         )}
 
-        {!loading && otherItems.length > 0 && (
+        {otherItems.length > 0 && (
           <div className="wash-done-other">
             <p className="wash-done-other-title">Ropa sin instrucciones especiales</p>
             <div className="wash-done-other-list">
@@ -70,7 +52,7 @@ export default function WashDoneModal({ presetId, presetName, onClose }) {
           </div>
         )}
 
-        {!loading && items.length === 0 && (
+        {clothing.length === 0 && (
           <p className="wash-done-empty">Saca la ropa y revísala antes de secar.</p>
         )}
 

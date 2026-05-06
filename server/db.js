@@ -49,8 +49,6 @@ try { db.exec(`ALTER TABLE presets ADD COLUMN dry_cycle TEXT NOT NULL DEFAULT ''
 try { db.exec(`ALTER TABLE presets ADD COLUMN dry_temp TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 try { db.exec(`ALTER TABLE presets ADD COLUMN dry_notes TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 
-try { db.exec(`ALTER TABLE clothing_items ADD COLUMN item_type TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
-try { db.exec(`ALTER TABLE clothing_items ADD COLUMN care_instructions TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 db.exec(`
   CREATE TABLE IF NOT EXISTS clothing_items (
     id                 TEXT PRIMARY KEY,
@@ -66,6 +64,9 @@ db.exec(`
     created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+try { db.exec(`ALTER TABLE clothing_items ADD COLUMN item_type TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE clothing_items ADD COLUMN care_instructions TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 
 // ── Seed default presets if table is empty ─────────────────────
 const count = db.prepare('SELECT COUNT(*) as n FROM presets').get();

@@ -44,4 +44,18 @@ export const api = {
   deleteClothing:        (id)           => req('DELETE', `/clothing/${id}`),
   assignClothing:        (id, presetId) => req('POST',   `/clothing/${id}/assign/${presetId}`),
   listPresetClothing:    (presetId)     => req('GET',    `/presets/${presetId}/clothing`),
+
+  // Scale (BLE)
+  getScaleConfig:        ()             => req('GET',    '/scale/config'),
+  saveScaleConfig:       (body)         => req('POST',   '/scale/config', body),
+  /** Returns an EventSource. Usage: const es = api.scaleStream(); es.onmessage = ... */
+  scaleStream:           ()             => new EventSource(`${API_BASE}/scale/stream`),
+
+  // OAuth
+  getOAuthStatus:        ()             => req('GET',    '/oauth/status'),
+  setupOAuth:            (body)         => req('POST',   '/oauth/setup', body),
+  refreshOAuth:          ()             => req('POST',   '/oauth/refresh'),
+  disconnectOAuth:       ()             => req('DELETE', '/oauth/disconnect'),
+  /** Navigates the browser to the OAuth authorize page (returns the URL, caller does window.location.href) */
+  oauthAuthorizeUrl:     ()             => `${API_BASE}/oauth/authorize?returnTo=${encodeURIComponent(window.location.origin + window.location.pathname)}`,
 };

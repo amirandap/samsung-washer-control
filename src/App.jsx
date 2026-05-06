@@ -40,6 +40,17 @@ export default function App() {
     }).catch(() => {}).finally(() => setConfigLoading(false));
   }, []);
 
+  // Clean oauth URL params after a successful redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('oauth') && params.get('oauth') !== 'error') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('oauth');
+      url.searchParams.delete('reason');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
+
   // ── Load presets ──────────────────────────────────
   const loadPresets = useCallback(() => {
     api.listPresets().then(setPresets).catch(console.error);

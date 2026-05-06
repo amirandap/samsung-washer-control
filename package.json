@@ -15,11 +15,16 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "src/**/*.{js,jsx}": ["eslint --fix"],
-    "server/**/*.js": ["eslint --fix"]
+    "src/**/*.{js,jsx}": [
+      "eslint --fix"
+    ],
+    "server/**/*.js": [
+      "eslint --fix"
+    ]
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.0",
+    "@stoprocent/noble": "^2.4.1",
     "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
     "express": "^4.19.0",

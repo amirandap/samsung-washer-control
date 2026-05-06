@@ -123,6 +123,24 @@ input[type="color"] { padding: 3px 4px; height: 36px; width: 36px; cursor: point
 .setup-hint a:hover { text-decoration: underline; }
 .muted { color: var(--muted); font-size: .78rem; }
 
+/* Setup tabs */
+.setup-tabs { display: flex; gap: 0; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+.setup-tab  { background: none; border: none; color: var(--muted); font-size: .85rem; padding: 8px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s; }
+.setup-tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+.setup-tab:hover:not(.active) { color: var(--fg); }
+.tab-badge { font-size: .68rem; padding: 1px 5px; border-radius: 8px; background: var(--accent); color: #fff; margin-left: 4px; vertical-align: middle; }
+.tab-badge--warn { background: #b45309; }
+
+/* OAuth tab */
+.setup-desc  { color: var(--muted); font-size: .87rem; margin-bottom: 14px; line-height: 1.6; }
+.setup-instructions { font-size: .82rem; color: var(--muted); background: var(--surface2, #1a1f2b); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px; line-height: 1.7; }
+.setup-instructions summary { cursor: pointer; color: var(--accent); margin-bottom: 4px; }
+.setup-instructions ol { margin: 6px 0 0 16px; }
+.setup-instructions code { background: #0d1117; padding: 1px 5px; border-radius: 4px; font-size: .8rem; }
+
+/* PAT warning */
+.pat-warning { background: #2a1a00; border: 1px solid #b45309; border-radius: var(--radius-sm); padding: 9px 13px; font-size: .83rem; color: #fbbf24; line-height: 1.5; margin-bottom: 14px; }
+
 .inline-error {
   background: #2e1010;
   border: 1px solid var(--danger);

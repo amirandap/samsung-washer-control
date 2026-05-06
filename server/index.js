@@ -13,6 +13,13 @@ import {
   discoverWasherDevice, getDeviceStatus, getRemoteControlStatus,
   discoverSpinLevels, applyPreset,
 } from './smartthings.js';
+import { scaleManager } from './scale.js';
+import {
+  buildAuthUrl, createOAuthState, consumeOAuthState,
+  exchangeCode, storeTokens, refreshOAuthToken, getValidToken,
+} from './oauth.js';
+
+const APP_BASE = (process.env.VITE_BASE_PATH || '').replace(/\/$/, ''); // e.g. '/lavadora'
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT ?? 3001;
@@ -25,7 +32,7 @@ app.use(express.json());
 app.use(express.static(join(__dirname, '..', 'dist')));
 
 // ── Bootstrap: persist env token into DB if not already stored ─
-if (process.env.SMARTTHINGS_TOKEN && !getConfig('token')) {
+if (process.env.SMARTTHINGS_TOKEN && !getConfig('token') && !getConfig('oauth_access_token')) {
   setConfig('token', process.env.SMARTTHINGS_TOKEN);
   console.log('[washer-api] token from env persisted to DB');
 }
@@ -34,10 +41,18 @@ if (process.env.SMARTTHINGS_TOKEN && !getConfig('token')) {
 //  CONFIG
 // ════════════════════════════════════════════════════
 app.get('/api/config', (_req, res) => {
+  const oauthClientId    = getConfig('oauth_client_id');
+  const oauthAccessToken = getConfig('oauth_access_token');
+  const expiresAtStr     = getConfig('oauth_token_expires_at');
+  const expiresAt        = expiresAtStr ? Number(expiresAtStr) : null;
   res.json({
-    token:    getConfig('token')    ?? '',
-    deviceId: getConfig('deviceId') ?? '',
-    label:    getConfig('label')    ?? '',
+    token:           oauthAccessToken || getConfig('token') || '',
+    deviceId:        getConfig('deviceId') ?? '',
+    label:           getConfig('label')    ?? '',
+    authMode:        oauthClientId ? 'oauth' : 'pat',
+    oauthConfigured: !!(oauthClientId && getConfig('oauth_client_secret')),
+    oauthConnected:  !!oauthAccessToken,
+    oauthExpiresAt:  expiresAt,
   });
 });
 
@@ -46,6 +61,120 @@ app.post('/api/config', (req, res) => {
   if (token    !== undefined) setConfig('token',    token);
   if (deviceId !== undefined) setConfig('deviceId', deviceId);
   if (label    !== undefined) setConfig('label',    label);
+  res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════
+//  OAUTH
+// ════════════════════════════════════════════════════
+
+// Save OAuth app credentials (client_id + client_secret)
+app.post('/api/oauth/setup', (req, res) => {
+  const { client_id, client_secret } = req.body ?? {};
+  if (!client_id || !client_secret) {
+    return res.status(400).json({ error: 'client_id and client_secret are required' });
+  }
+  setConfig('oauth_client_id',     client_id.trim());
+  setConfig('oauth_client_secret', client_secret.trim());
+  res.json({ ok: true });
+});
+
+// Returns OAuth connection status
+app.get('/api/oauth/status', (_req, res) => {
+  const oauthClientId    = getConfig('oauth_client_id');
+  const oauthAccessToken = getConfig('oauth_access_token');
+  const expiresAtStr     = getConfig('oauth_token_expires_at');
+  const expiresAt        = expiresAtStr ? Number(expiresAtStr) : null;
+  res.json({
+    configured: !!oauthClientId,
+    connected:  !!oauthAccessToken,
+    expires_at: expiresAt,
+    expired:    expiresAt ? Date.now() > expiresAt : false,
+  });
+});
+
+// Initiate OAuth flow — redirects browser to SmartThings auth page
+app.get('/api/oauth/authorize', (req, res) => {
+  const clientId = getConfig('oauth_client_id');
+  if (!clientId) return res.status(400).send('OAuth not configured. POST /api/oauth/setup first.');
+
+  const proto       = (req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() || req.protocol;
+  const host        = req.headers['x-forwarded-host'] || req.get('host');
+  const redirectUri = `${proto}://${host}${APP_BASE}/api/oauth/callback`;
+  const returnTo    = req.query.returnTo || `${proto}://${host}${APP_BASE}/`;
+
+  const state   = createOAuthState(redirectUri, returnTo);
+  const authUrl = buildAuthUrl(clientId, redirectUri, state);
+  res.redirect(authUrl);
+});
+
+// OAuth callback — exchanges code for tokens, saves, redirects to frontend
+app.get('/api/oauth/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+  const base = APP_BASE || '/';
+
+  if (error) {
+    console.error('[oauth] provider error:', error);
+    return res.redirect(`${base}?oauth=error&reason=${encodeURIComponent(error)}`);
+  }
+  if (!code || !state) {
+    return res.redirect(`${base}?oauth=error&reason=missing_code`);
+  }
+
+  const entry = consumeOAuthState(state);
+  if (!entry) {
+    return res.status(400).send('OAuth state inválido o expirado. Por favor intenta de nuevo.');
+  }
+
+  const clientId     = getConfig('oauth_client_id');
+  const clientSecret = getConfig('oauth_client_secret');
+  try {
+    const tokenData = await exchangeCode({
+      code,
+      clientId,
+      clientSecret,
+      redirectUri: entry.redirectUri,
+    });
+    storeTokens(tokenData);
+    console.log('[oauth] tokens stored successfully');
+
+    // Auto-discover device if not already configured
+    if (!getConfig('deviceId')) {
+      try {
+        const device = await discoverWasherDevice(tokenData.access_token);
+        if (device) {
+          setConfig('deviceId', device.deviceId);
+          setConfig('label',    device.label);
+          console.log(`[oauth] device discovered: ${device.label} (${device.deviceId})`);
+        }
+      } catch (e) {
+        console.warn('[oauth] auto-discover failed:', e.message);
+      }
+    }
+
+    const returnTo = entry.returnTo.replace(/\?.*$/, '');
+    res.redirect(`${returnTo}?oauth=success`);
+  } catch (err) {
+    console.error('[oauth] code exchange failed:', err.message);
+    res.redirect(`${base}?oauth=error&reason=${encodeURIComponent(err.message)}`);
+  }
+});
+
+// Manually refresh OAuth token
+app.post('/api/oauth/refresh', async (_req, res) => {
+  try {
+    await refreshOAuthToken();
+    res.json({ ok: true, expires_at: Number(getConfig('oauth_token_expires_at')) });
+  } catch (err) {
+    res.status(err.status ?? 500).json({ error: err.message });
+  }
+});
+
+// Disconnect OAuth (clears tokens, keeps credentials)
+app.delete('/api/oauth/disconnect', (_req, res) => {
+  setConfig('oauth_access_token',    '');
+  setConfig('oauth_refresh_token',   '');
+  setConfig('oauth_token_expires_at', '');
   res.json({ ok: true });
 });
 
@@ -71,7 +200,7 @@ app.post('/api/discover', async (req, res) => {
 //  DEVICE STATUS
 // ════════════════════════════════════════════════════
 app.get('/api/status', async (_req, res) => {
-  const token    = getConfig('token');
+  const token    = await getValidToken();
   const deviceId = getConfig('deviceId');
   if (!token || !deviceId) return res.status(400).json({ error: 'Not configured' });
   try {
@@ -83,7 +212,7 @@ app.get('/api/status', async (_req, res) => {
 });
 
 app.get('/api/remote-status', async (_req, res) => {
-  const token    = getConfig('token');
+  const token    = await getValidToken();
   const deviceId = getConfig('deviceId');
   if (!token || !deviceId) return res.status(400).json({ error: 'Not configured' });
   try {
@@ -178,7 +307,7 @@ app.get('/api/presets/:id/clothing', (req, res) => {
 //  APPLY PRESET
 // ════════════════════════════════════════════════════
 app.post('/api/presets/:id/apply', async (req, res) => {
-  const token    = getConfig('token');
+  const token    = await getValidToken();
   const deviceId = getConfig('deviceId');
   if (!token || !deviceId) return res.status(400).json({ error: 'Not configured' });
 
@@ -206,6 +335,70 @@ app.post('/api/presets/:id/apply', async (req, res) => {
 // ════════════════════════════════════════════════════
 app.get('/api/history', (_req, res) => {
   res.json(getHistory());
+});
+
+// ════════════════════════════════════════════════════
+//  SCALE (BLE)
+// ════════════════════════════════════════════════════
+
+// GET /api/scale/config — read saved BT address
+app.get('/api/scale/config', (_req, res) => {
+  res.json({ address: getConfig('scaleAddress') ?? '' });
+});
+
+// POST /api/scale/config — save BT address
+app.post('/api/scale/config', (req, res) => {
+  const { address } = req.body ?? {};
+  if (address !== undefined) setConfig('scaleAddress', address);
+  res.json({ ok: true });
+});
+
+// GET /api/scale/stream — SSE stream of weight events
+// Events:
+//   data: {type:'status', scanning, source}
+//   data: {type:'reading', weight_kg, detergent_ml, load_level, source}  ← live, each stable notification
+//   data: {type:'weight',  weight_kg, detergent_ml, load_level, source}  ← settled final reading
+app.get('/api/scale/stream', (req, res) => {
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+  res.flushHeaders();
+
+  const send = (type, payload) => {
+    res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+  };
+
+  // Send current status immediately
+  send('status', { scanning: scaleManager.scanning, source: scaleManager.source });
+  if (scaleManager.lastWeight !== null) {
+    const kg = scaleManager.lastWeight;
+    send('reading', { weight_kg: kg, stable: true, source: scaleManager.source });
+  }
+
+  // Wire up listeners
+  const onReading = (d) => send('reading', d);
+  const onWeight  = (d) => send('weight',  d);
+  const onStatus  = (d) => send('status',  d);
+
+  scaleManager.on('reading', onReading);
+  scaleManager.on('weight',  onWeight);
+  scaleManager.on('status',  onStatus);
+
+  // Start scanning if not already running
+  const address = getConfig('scaleAddress') || undefined;
+  scaleManager.start(address);
+
+  // Clean up on disconnect
+  req.on('close', () => {
+    scaleManager.removeListener('reading', onReading);
+    scaleManager.removeListener('weight',  onWeight);
+    scaleManager.removeListener('status',  onStatus);
+    // Stop scanning only when no more SSE clients are connected
+    if (scaleManager.listenerCount('reading') === 0) {
+      scaleManager.stop();
+    }
+  });
 });
 
 // ── SPA fallback ───────────────────────────────────

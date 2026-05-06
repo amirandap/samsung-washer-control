@@ -1,7 +1,8 @@
 import { COLOR_SWATCHES, parseCompatColors } from '../constants.js';
 
-export default function PresetCard({ preset, clothing = [], isApplying, onApply, onEdit, onDelete }) {
+export default function PresetCard({ preset, isApplying, onApply, onEdit, onDelete }) {
   const compatColors = parseCompatColors(preset.compat_colors);
+  const clothing  = preset.clothing_items ?? [];
   const brands    = [...new Set(clothing.map(i => i.brand).filter(Boolean))];
   const itemTypes = [...new Set(clothing.map(i => i.item_type).filter(Boolean))];
 

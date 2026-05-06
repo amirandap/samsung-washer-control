@@ -27,6 +27,7 @@ export const api = {
 
   // Presets
   listPresets:     ()           => req('GET',    '/presets'),
+  listPresetsWithClothing: ()  => req('GET',    '/presets-with-clothing'),
   getPreset:       (id)         => req('GET',    `/presets/${id}`),
   createPreset:    (body)       => req('POST',   '/presets', body),
   updatePreset:    (id, body)   => req('PUT',    `/presets/${id}`, body),

@@ -1,6 +1,6 @@
 import PresetCard from './PresetCard.jsx';
 
-export default function PresetGrid({ presets, clothing = [], applying, onApply, onEdit, onDelete, onNew }) {
+export default function PresetGrid({ presets, applying, onApply, onEdit, onDelete, onNew }) {
   return (
     <section className="presets-section">
       <div className="presets-header">
@@ -17,7 +17,6 @@ export default function PresetGrid({ presets, clothing = [], applying, onApply, 
             <PresetCard
               key={p.id}
               preset={p}
-              clothing={clothing.filter(c => c.preset_id === p.id)}
               isApplying={applying === p.id}
               onApply={onApply}
               onEdit={onEdit}

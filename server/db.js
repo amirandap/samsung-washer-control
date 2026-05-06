@@ -299,4 +299,37 @@ export function listUnassignedClothing() {
   return clothingQueries.unassigned.all();
 }
 
+// ── Presets with clothing items (single JOIN query) ────────────
+const presetsWithClothingQuery = db.prepare(`
+  SELECT
+    p.*,
+    COALESCE(json_group_array(
+      CASE WHEN c.id IS NOT NULL THEN json_object(
+        'id',                c.id,
+        'brand',             c.brand,
+        'name',              c.name,
+        'item_type',         c.item_type,
+        'colors',            c.colors,
+        'fabric',            c.fabric,
+        'care_temp',         c.care_temp,
+        'care_cycle',        c.care_cycle,
+        'care_instructions', c.care_instructions,
+        'preset_id',         c.preset_id,
+        'notes',             c.notes
+      ) END
+    ) FILTER (WHERE c.id IS NOT NULL), '[]') AS clothing_items
+  FROM presets p
+  LEFT JOIN clothing_items c ON c.preset_id = p.id
+  GROUP BY p.id
+  ORDER BY p.sort_order, p.created_at
+`);
+
+export function listPresetsWithClothing() {
+  return presetsWithClothingQuery.all().map(row => ({
+    ...row,
+    eco: row.eco === 1,
+    clothing_items: JSON.parse(row.clothing_items ?? '[]'),
+  }));
+}
+
 export default db;

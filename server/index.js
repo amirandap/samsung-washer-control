@@ -7,7 +7,7 @@ import {
   getConfig, setConfig, recordHistory, getHistory,
   listClothing, listClothingByPreset, getClothingItem,
   createClothingItem, updateClothingItem, deleteClothingItem, assignClothingToPreset,
-  listUnassignedClothing,
+  listUnassignedClothing, listPresetsWithClothing,
 } from './db.js';
 import {
   discoverWasherDevice, getDeviceStatus, getRemoteControlStatus,
@@ -232,6 +232,12 @@ app.get('/api/remote-status', async (_req, res) => {
 // ════════════════════════════════════════════════════
 app.get('/api/presets', (_req, res) => {
   try { res.json(listPresets()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Returns presets with clothing_items[] embedded — single SQL JOIN, no N+1
+app.get('/api/presets-with-clothing', (_req, res) => {
+  try { res.json(listPresetsWithClothing()); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 

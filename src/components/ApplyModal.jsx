@@ -34,9 +34,9 @@ function DetergentBar({ ml, max = 150 }) {
   );
 }
 
-export default function ApplyModal({ preset, clothing = [], onConfirm, onClose }) {
+export default function ApplyModal({ preset, onConfirm, onClose }) {
   const [lbs, setLbs] = useState('');
-  const careItems = clothing.filter(i => i.care_instructions?.trim());
+  const careItems = (preset.clothing_items ?? []).filter(i => i.care_instructions?.trim());
   const inputRef = useRef(null);
 
   useEffect(() => {

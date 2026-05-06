@@ -96,15 +96,19 @@ app.get('/api/oauth/status', (_req, res) => {
 // Initiate OAuth flow — redirects browser to SmartThings auth page
 app.get('/api/oauth/authorize', (req, res) => {
   const clientId = getConfig('oauth_client_id');
-  if (!clientId) return res.status(400).send('OAuth not configured. POST /api/oauth/setup first.');
+  if (!clientId) return res.status(400).send('OAuth not configured.');
 
-  const proto       = (req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() || req.protocol;
-  const host        = req.headers['x-forwarded-host'] || req.get('host');
-  const redirectUri = `${proto}://${host}${APP_BASE}/api/oauth/callback`;
-  const returnTo    = req.query.returnTo || `${proto}://${host}${APP_BASE}/`;
+  // Use explicit env var so it matches exactly what was registered in SmartThings.
+  // Fallback to dynamic construction (requires correct x-forwarded headers in nginx).
+  const redirectUri = process.env.OAUTH_REDIRECT_URI || (() => {
+    const proto = (req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() || req.protocol;
+    const host  = req.headers['x-forwarded-host'] || req.get('host');
+    return `${proto}://${host}${APP_BASE}/api/oauth/callback`;
+  })();
 
-  const state   = createOAuthState(redirectUri, returnTo);
-  const authUrl = buildAuthUrl(clientId, redirectUri, state);
+  const returnTo = req.query.returnTo || redirectUri.replace('/api/oauth/callback', '/');
+  const state    = createOAuthState(redirectUri, returnTo);
+  const authUrl  = buildAuthUrl(clientId, redirectUri, state);
   res.redirect(authUrl);
 });
 

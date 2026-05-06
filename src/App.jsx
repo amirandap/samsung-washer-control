@@ -36,6 +36,11 @@ export default function App() {
   // ── Init ──────────────────────────────────────────
   useEffect(() => {
     api.getConfig().then(cfg => {
+      // If OAuth credentials are saved but no active token → auto-authorize
+      if (cfg.oauthConfigured && !cfg.oauthConnected) {
+        window.location.href = api.oauthAuthorizeUrl();
+        return;
+      }
       if (cfg.token && cfg.deviceId) setConfigured(true);
     }).catch(() => {}).finally(() => setConfigLoading(false));
   }, []);

@@ -15,6 +15,7 @@
  *   4. Enter them in the app's Setup panel → OAuth tab
  */
 
+import { randomBytes } from 'crypto';
 import { getConfig, setConfig } from './db.js';
 
 const ST_AUTH_URL     = 'https://api.smartthings.com/oauth/authorize';
@@ -24,13 +25,20 @@ const TOKEN_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 // ── In-memory CSRF state store ────────────────────────────────
 const pendingStates = new Map(); // state → { expiresAt, redirectUri, returnTo }
 
+// Purge expired entries to prevent unbounded growth
+function pruneExpiredStates() {
+  const now = Date.now();
+  for (const [key, entry] of pendingStates) {
+    if (now > entry.expiresAt) pendingStates.delete(key);
+  }
+}
+
 function generateState() {
-  const arr = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256);
-  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+  return randomBytes(16).toString('hex');
 }
 
 export function createOAuthState(redirectUri, returnTo) {
+  pruneExpiredStates();
   const state = generateState();
   pendingStates.set(state, {
     expiresAt: Date.now() + 10 * 60 * 1000, // 10 min window

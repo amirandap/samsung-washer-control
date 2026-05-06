@@ -231,13 +231,16 @@ app.get('/api/remote-status', async (_req, res) => {
 //  PRESETS CRUD
 // ════════════════════════════════════════════════════
 app.get('/api/presets', (_req, res) => {
-  res.json(listPresets());
+  try { res.json(listPresets()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/presets/:id', (req, res) => {
-  const preset = getPreset(req.params.id);
-  if (!preset) return res.status(404).json({ error: 'Preset not found' });
-  res.json(preset);
+  try {
+    const preset = getPreset(req.params.id);
+    if (!preset) return res.status(404).json({ error: 'Preset not found' });
+    res.json(preset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/presets', (req, res) => {
@@ -245,66 +248,85 @@ app.post('/api/presets', (req, res) => {
   if (!name || !cycle || !temp) {
     return res.status(400).json({ error: 'name, cycle and temp are required' });
   }
-  const preset = createPreset({ name, subtitle, cycle, temp, spin_rpm, eco, color, clothes, compat_colors, notes });
-  res.status(201).json(preset);
+  try {
+    const preset = createPreset({ name, subtitle, cycle, temp, spin_rpm, eco, color, clothes, compat_colors, notes });
+    res.status(201).json(preset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/presets/:id', (req, res) => {
-  const updated = updatePreset(req.params.id, req.body ?? {});
-  if (!updated) return res.status(404).json({ error: 'Preset not found' });
-  res.json(updated);
+  try {
+    const updated = updatePreset(req.params.id, req.body ?? {});
+    if (!updated) return res.status(404).json({ error: 'Preset not found' });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/presets/:id', (req, res) => {
-  const deleted = deletePreset(req.params.id);
-  if (!deleted) return res.status(404).json({ error: 'Preset not found' });
-  res.json({ ok: true });
+  try {
+    const deleted = deletePreset(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Preset not found' });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ════════════════════════════════════════════════════
 //  CLOTHING ITEMS
 // ════════════════════════════════════════════════════
 app.get('/api/clothing', (_req, res) => {
-  res.json(listClothing());
+  try { res.json(listClothing()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/clothing/unassigned', (_req, res) => {
-  res.json(listUnassignedClothing());
+  try { res.json(listUnassignedClothing()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/clothing/:id', (req, res) => {
-  const item = getClothingItem(req.params.id);
-  if (!item) return res.status(404).json({ error: 'Not found' });
-  res.json(item);
+  try {
+    const item = getClothingItem(req.params.id);
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    res.json(item);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/clothing', (req, res) => {
-  const item = createClothingItem(req.body ?? {});
-  res.status(201).json(item);
+  try {
+    const item = createClothingItem(req.body ?? {});
+    res.status(201).json(item);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/clothing/:id', (req, res) => {
-  const updated = updateClothingItem(req.params.id, req.body ?? {});
-  if (!updated) return res.status(404).json({ error: 'Not found' });
-  res.json(updated);
+  try {
+    const updated = updateClothingItem(req.params.id, req.body ?? {});
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/clothing/:id', (req, res) => {
-  const ok = deleteClothingItem(req.params.id);
-  if (!ok) return res.status(404).json({ error: 'Not found' });
-  res.json({ ok: true });
+  try {
+    const ok = deleteClothingItem(req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/clothing/:id/assign/:presetId', (req, res) => {
-  const { id, presetId } = req.params;
-  if (!getClothingItem(id))   return res.status(404).json({ error: 'Clothing item not found' });
-  if (!getPreset(presetId))   return res.status(404).json({ error: 'Preset not found' });
-  assignClothingToPreset(id, presetId);
-  res.json({ ok: true });
+  try {
+    const { id, presetId } = req.params;
+    if (!getClothingItem(id))   return res.status(404).json({ error: 'Clothing item not found' });
+    if (!getPreset(presetId))   return res.status(404).json({ error: 'Preset not found' });
+    assignClothingToPreset(id, presetId);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/presets/:id/clothing', (req, res) => {
-  res.json(listClothingByPreset(req.params.id));
+  try { res.json(listClothingByPreset(req.params.id)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ════════════════════════════════════════════════════
@@ -338,7 +360,8 @@ app.post('/api/presets/:id/apply', async (req, res) => {
 //  HISTORY
 // ════════════════════════════════════════════════════
 app.get('/api/history', (_req, res) => {
-  res.json(getHistory());
+  try { res.json(getHistory()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ════════════════════════════════════════════════════
@@ -393,8 +416,14 @@ app.get('/api/scale/stream', (req, res) => {
   const address = getConfig('scaleAddress') || undefined;
   scaleManager.start(address);
 
+  // Keepalive: prevents nginx and proxies from closing idle SSE connections
+  const keepaliveInterval = setInterval(() => {
+    res.write(':keepalive\n\n');
+  }, 30000);
+
   // Clean up on disconnect
   req.on('close', () => {
+    clearInterval(keepaliveInterval);
     scaleManager.removeListener('reading', onReading);
     scaleManager.removeListener('weight',  onWeight);
     scaleManager.removeListener('status',  onStatus);

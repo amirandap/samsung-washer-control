@@ -273,6 +273,7 @@ export default function App() {
           onApply={handleApply}
           onEdit={openEdit}
           onDelete={handleDelete}
+          onNew={openCreate}
         />
       </div>
 

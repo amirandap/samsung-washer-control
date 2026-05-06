@@ -6,7 +6,6 @@ function OAuthTab({ showToast }) {
   const [clientId,     setClientId]     = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [loading,      setLoading]      = useState(false);
-  const [saved,        setSaved]        = useState(false);
   const [error,        setError]        = useState('');
 
   const handleAuthorize = async () => {

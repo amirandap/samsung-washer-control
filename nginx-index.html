@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Control</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    header .logo {
+      font-size: 22px;
+      font-weight: 700;
+      color: #58a6ff;
+      letter-spacing: -0.5px;
+    }
+
+    header .logo span { color: #e6edf3; }
+
+    nav {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+    }
+
+    nav a {
+      color: #8b949e;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    nav a:hover { background: #21262d; color: #e6edf3; }
+    nav a.active { background: #1f6feb; color: #fff; }
+
+    main {
+      flex: 1;
+      padding: 48px 32px;
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #8b949e;
+      font-size: 15px;
+      margin-bottom: 40px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+
+    .card:hover {
+      border-color: #58a6ff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .card-icon.frigate  { background: #1a3a2a; }
+    .card-icon.hass     { background: #1a2a3a; }
+    .card-icon.scrypted { background: #2a1a3a; }
+    .card-icon.go2rtc   { background: #3a2a1a; }
+    .card-icon.cctv     { background: #2a1a1a; }
+    .card-icon.washer   { background: #1a2a3a; }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+
+    .card-port {
+      margin-top: auto;
+      font-size: 12px;
+      color: #58a6ff;
+      font-family: monospace;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #30363d;
+      font-size: 12px;
+      border-top: 1px solid #21262d;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">CCTV <span>Panel</span></div>
+  <nav>
+    <a href="index.html" class="active">Inicio</a>
+    <a href="cameras.html">Cámaras en Vivo</a>
+  </nav>
+</header>
+
+<main>
+  <h1>Panel de Control</h1>
+  <p class="subtitle">Accesos rápidos a los servicios del sistema de vigilancia</p>
+
+  <div class="grid">
+
+    <a class="card" href="cameras.html">
+      <div class="card-icon cctv">📷</div>
+      <div class="card-title">CCTV en Vivo</div>
+      <div class="card-desc">Grid completo de todas las cámaras con stream WebRTC en tiempo real.</div>
+      <div class="card-port">27 cámaras</div>
+    </a>
+
+    <a class="card" href="/lavadora/">
+      <div class="card-icon washer">🫧</div>
+      <div class="card-title">Lavadora</div>
+      <div class="card-desc">Control remoto SmartThings para lavadora Samsung. Presets y monitoreo.</div>
+      <div class="card-port">/lavadora/</div>
+    </a>
+
+    <a class="card" href="http://10.0.0.111:5000" target="_blank">
+      <div class="card-icon frigate">🦅</div>
+      <div class="card-title">Frigate NVR</div>
+      <div class="card-desc">Grabaciones, eventos, detección de objetos y alertas con IA.</div>
+      <div class="card-port">:5000</div>
+    </a>
+
+    <a class="card" href="http://10.0.0.235:8123" target="_blank">
+      <div class="card-icon hass">🏠</div>
+      <div class="card-title">Home Assistant</div>
+      <div class="card-desc">Automatización del hogar, dashboards y control de dispositivos.</div>
+      <div class="card-port">10.0.0.235:8123</div>
+    </a>
+
+    <a class="card" href="https://10.0.0.111:10443" target="_blank">
+      <div class="card-icon scrypted">🔐</div>
+      <div class="card-title">Scrypted</div>
+      <div class="card-desc">Integración HomeKit Secure Video y puente entre plataformas.</div>
+      <div class="card-port">:10443</div>
+    </a>
+
+    <a class="card" href="http://10.0.0.111:1984" target="_blank">
+      <div class="card-icon go2rtc">📡</div>
+      <div class="card-title">go2rtc</div>
+      <div class="card-desc">Proxy de streams RTSP/WebRTC. Configuración y estado de streams.</div>
+      <div class="card-port">:1984</div>
+    </a>
+
+  </div>
+</main>
+
+<footer>10.0.0.111 &mdash; Debian &mdash; Frigate 0.16.3</footer>
+
+</body>
+</html>

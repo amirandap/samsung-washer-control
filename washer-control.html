@@ -400,6 +400,7 @@
 //  CONFIG & STATE
 // ═══════════════════════════════════════════════════
 const API = 'https://api.smartthings.com/v1';
+const LOCAL_API = '/api'; // Database API endpoint
 
 // Spin level mapping by RPM target — will be resolved from device capabilities
 const SPIN_RPM_HINTS = {
@@ -425,18 +426,32 @@ let countdownTimer = null;
 let nextRefreshIn  = 30;
 
 // ═══════════════════════════════════════════════════
-//  STORAGE
+//  STORAGE (now uses database via API)
 // ═══════════════════════════════════════════════════
-function saveState() {
-  localStorage.setItem('st_token',    token);
-  localStorage.setItem('st_deviceId', deviceId);
-  localStorage.setItem('st_label',    deviceLabel);
+async function saveState() {
+  try {
+    await fetch(`${LOCAL_API}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, deviceId, label: deviceLabel }),
+    });
+  } catch (err) {
+    console.error('[saveState] failed:', err);
+  }
 }
 
-function loadState() {
-  token       = localStorage.getItem('st_token')    || '';
-  deviceId    = localStorage.getItem('st_deviceId') || '';
-  deviceLabel = localStorage.getItem('st_label')    || '';
+async function loadState() {
+  try {
+    const res = await fetch(`${LOCAL_API}/config`);
+    if (res.ok) {
+      const data = await res.json();
+      token = data.token || '';
+      deviceId = data.deviceId || '';
+      deviceLabel = data.label || '';
+    }
+  } catch (err) {
+    console.error('[loadState] failed:', err);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -531,7 +546,7 @@ async function handleConnect() {
       const info = await apiFetch(`/devices/${deviceId}`);
       deviceLabel = info.label || info.name || deviceId;
     }
-    saveState();
+    await saveState();
     showApp();
     await discoverSpinLevels();
     startPolling();
@@ -793,8 +808,8 @@ async function sendCommand(capability, command, args) {
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
-(function init() {
-  loadState();
+(async function init() {
+  await loadState();
   if (token && deviceId) {
     showApp();
     discoverSpinLevels();

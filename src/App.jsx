@@ -12,6 +12,7 @@ export default function App() {
   // ── Config state ─────────────────────────────────
   const [configured, setConfigured] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
+  const [authMode, setAuthMode] = useState('pat'); // 'oauth' | 'pat'
 
   // ── Status state ─────────────────────────────────
   const [status, setStatus]   = useState(null);
@@ -33,20 +34,9 @@ export default function App() {
     setToast({ msg, type, key: Date.now() });
   }, []);
 
-  // ── Init ──────────────────────────────────────────
+  // ── Init: load everything before showing the app ─────────────
   useEffect(() => {
-    api.getConfig().then(cfg => {
-      // If OAuth credentials are saved but no active token → auto-authorize
-      if (cfg.oauthConfigured && !cfg.oauthConnected) {
-        window.location.href = api.oauthAuthorizeUrl();
-        return;
-      }
-      if (cfg.token && cfg.deviceId) setConfigured(true);
-    }).catch(() => {}).finally(() => setConfigLoading(false));
-  }, []);
-
-  // Clean oauth URL params after a successful redirect
-  useEffect(() => {
+    // Clean oauth URL params from a successful redirect
     const params = new URLSearchParams(window.location.search);
     if (params.has('oauth') && params.get('oauth') !== 'error') {
       const url = new URL(window.location.href);
@@ -54,16 +44,62 @@ export default function App() {
       url.searchParams.delete('reason');
       window.history.replaceState({}, '', url.toString());
     }
-  }, []);
 
-  // ── Load presets ──────────────────────────────────
+    async function init() {
+      try {
+        const cfg = await api.getConfig();
+
+        // OAuth configured but no active token → redirect silently, no flash
+        if (cfg.oauthConfigured && !cfg.oauthConnected) {
+          window.location.href = api.oauthAuthorizeUrl();
+          return;
+        }
+
+        setAuthMode(cfg.authMode ?? 'pat');
+
+        if (!cfg.token || !cfg.deviceId) {
+          setConfigLoading(false);
+          return;
+        }
+
+        // Load presets + status in parallel — app shows only when both are ready
+        const [presetsData, statusData] = await Promise.all([
+          api.listPresets(),
+          api.getStatus().catch(err => {
+            // 401 = token invalid; re-auth if OAuth, otherwise show setup
+            if (err.status === 401) throw err;
+            // Non-auth error: show app but with status error
+            setStatusErr(err.message);
+            return null;
+          }),
+        ]);
+
+        setPresets(presetsData);
+        if (statusData) setStatus(statusData);
+        setConfigured(true);
+      } catch (err) {
+        if (err.status === 401) {
+          // Token invalid — try to re-auth via OAuth silently
+          try {
+            const cfg = await api.getConfig();
+            if (cfg.oauthConfigured) {
+              window.location.href = api.oauthAuthorizeUrl();
+              return;
+            }
+          } catch (_) { /* fall through to setup */ }
+        }
+        // Not configured or unrecoverable → show setup
+      } finally {
+        setConfigLoading(false);
+      }
+    }
+    init();
+  }, []);  
+
+  // ── Reload presets (used after create/edit/delete) ────────────
   const loadPresets = useCallback(() => {
     api.listPresets().then(setPresets).catch(console.error);
   }, []);
-
-  useEffect(() => {
-    if (configured) loadPresets();
-  }, [configured, loadPresets]);
 
   // ── Status polling ─────────────────────────────────
   const fetchStatus = useCallback(async () => {
@@ -74,12 +110,15 @@ export default function App() {
     } catch (err) {
       setStatusErr(err.message);
       if (err.status === 401) {
-        showToast('🔑 Token expirado. Reconecta.', 'error');
-        setConfigured(false);
+        // Silently re-auth if OAuth, otherwise drop to setup
+        api.getConfig().then(cfg => {
+          if (cfg.oauthConfigured) window.location.href = api.oauthAuthorizeUrl();
+          else setConfigured(false);
+        }).catch(() => setConfigured(false));
       }
     }
     setNextRefresh(30);
-  }, [showToast]);
+  }, []);
 
   const refreshRef = useRef(null);
   const countdownRef = useRef(null);
@@ -90,7 +129,7 @@ export default function App() {
       clearInterval(countdownRef.current);
       return;
     }
-    fetchStatus();
+    // Status already loaded during init — just start polling
     refreshRef.current   = setInterval(fetchStatus, 30000);
     countdownRef.current = setInterval(() => setNextRefresh(n => Math.max(0, n - 1)), 1000);
     return () => {
@@ -217,8 +256,13 @@ export default function App() {
               onRefresh={fetchStatus}
             />
             <button className="btn btn-primary btn-sm" onClick={openCreate}>+ Nuevo</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setConfigured(false)}>
-              Cambiar token
+            <button className="btn btn-ghost btn-sm" onClick={async () => {
+              if (authMode === 'oauth') {
+                await api.disconnectOAuth().catch(() => {});
+              }
+              setConfigured(false);
+            }}>
+              {authMode === 'oauth' ? 'Desconectar' : 'Cambiar token'}
             </button>
           </div>
         </header>

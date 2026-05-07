@@ -237,6 +237,9 @@ export default function App() {
     }
   }, [applyTarget, fetchStatus, showToast]);
 
+  // ── Settings panel ────────────────────────────────
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   // ── Editor ────────────────────────────────────────
   const openCreate = () => { setEditingPreset(null); setEditorOpen(true); };
   const openEdit   = (p) => { setEditingPreset(p);   setEditorOpen(true); };
@@ -300,14 +303,8 @@ export default function App() {
               nextRefresh={nextRefresh}
               onRefresh={fetchStatus}
             />
-            <button className="btn btn-primary btn-sm" onClick={openCreate}>+ Nuevo</button>
-            <button className="btn btn-ghost btn-sm" onClick={async () => {
-              if (authMode === 'oauth') {
-                await api.disconnectOAuth().catch(() => {});
-              }
-              setConfigured(false);
-            }}>
-              {authMode === 'oauth' ? 'Desconectar' : 'Cambiar token'}
+            <button className="btn btn-icon" onClick={() => setSettingsOpen(true)} aria-label="Ajustes">
+              ⚙️
             </button>
           </div>
         </header>
@@ -321,6 +318,40 @@ export default function App() {
           onNew={openCreate}
         />
       </div>
+
+      {settingsOpen && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setSettingsOpen(false)}>
+          <div className="modal modal-sm settings-sheet">
+            <div className="modal-header">
+              <h3>⚙️ Ajustes</h3>
+              <button type="button" className="btn btn-icon" onClick={() => setSettingsOpen(false)}>✕</button>
+            </div>
+            <div className="settings-body">
+              <button className="settings-row" onClick={() => { setSettingsOpen(false); openCreate(); }}>
+                <span className="settings-row-icon">＋</span>
+                <div className="settings-row-text">
+                  <span className="settings-row-label">Nuevo preset</span>
+                  <span className="settings-row-desc">Crear ciclo de lavado personalizado</span>
+                </div>
+                <span className="settings-row-chevron">›</span>
+              </button>
+              <div className="settings-divider" />
+              <button className="settings-row settings-row-danger" onClick={async () => {
+                setSettingsOpen(false);
+                if (authMode === 'oauth') await api.disconnectOAuth().catch(() => {});
+                setConfigured(false);
+              }}>
+                <span className="settings-row-icon">🔌</span>
+                <div className="settings-row-text">
+                  <span className="settings-row-label">{authMode === 'oauth' ? 'Desconectar cuenta' : 'Cambiar token'}</span>
+                  <span className="settings-row-desc">Volver a la pantalla de configuración</span>
+                </div>
+                <span className="settings-row-chevron">›</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editorOpen && (
         <PresetEditor

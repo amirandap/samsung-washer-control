@@ -3,7 +3,7 @@ import { api } from '../api.js';
 import { detergentLabel } from '../constants.js';
 
 const LB_STEP  = 1;
-const STALE_MS = 5 * 60 * 1000; // 5 minutes
+const STALE_MS = 5 * 60 * 1000;
 
 function calcDetergent(kg, preset) {
   if (!kg || kg <= 0) return null;
@@ -60,6 +60,7 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
+
   const isFresh = weightInfo && (now - new Date(weightInfo.receivedAt)) < STALE_MS;
   const kg      = lbs !== null ? lbs / 2.20462 : null;
   const ml      = kg  !== null ? calcDetergent(kg, preset) : null;
@@ -77,75 +78,86 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
   };
 
   return (
-    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal modal-sm" role="dialog" aria-modal="true">
-        <form onSubmit={handleSubmit} className="modal-form">
-          <div className="modal-header">
-            <h3>⚙️ <span style={{ color: preset.color }}>{preset.name}</span></h3>
-            <button type="button" className="btn btn-icon" onClick={onClose}>✕</button>
-          </div>
-
-          <div className="modal-body">
-
-            <div className={`weight-source-row ${weightInfo ? (isFresh ? 'weight-fresh' : 'weight-stale') : 'weight-none'}`}>
-              <span className="weight-source-dot" />
-              {weightInfo ? (
-                <>
-                  <span className="weight-source-val">{weightInfo.lbs.toFixed(1)} lbs</span>
-                  <span className="weight-source-meta">
-                    {(weightInfo.lbs / 2.20462).toFixed(2)} kg · {timeAgo(weightInfo.receivedAt)}
-                    {!isFresh && <span className="weight-source-stale-note"> — desactualizado</span>}
-                  </span>
-                </>
-              ) : (
-                <span className="weight-source-meta">Sin peso registrado</span>
-              )}
-            </div>
-
-            <div className="weight-stepper">
-              <button type="button" className="stepper-btn stepper-minus" onClick={() => adjust(-LB_STEP)}>−</button>
-              <div className="stepper-display">
-                {lbs !== null
-                  ? <><span className="stepper-num">{lbs.toFixed(0)}</span><span className="stepper-unit">lbs</span></>
-                  : <span className="stepper-placeholder">— lbs</span>
-                }
-                {lbs !== null && <span className="stepper-lbs">{(lbs / 2.20462).toFixed(2)} kg</span>}
-              </div>
-              <button type="button" className="stepper-btn stepper-plus" onClick={() => adjust(+LB_STEP)}>+</button>
-            </div>
-
-            {valid && (
-              <div className="det-result">
-                <div className="det-ml-display">
-                  <span className="det-ml-num">{ml}</span>
-                  <span className="det-ml-unit">ml</span>
-                </div>
-                <div className="det-ml-label">{detergent.emoji} {detergent.label}</div>
-              </div>
-            )}
-
-            {careItems.length > 0 && (
-              <div className="care-instructions-block">
-                <div className="care-instructions-title">⚠️ Instrucciones de cuidado</div>
-                <ul className="care-instructions-list">
-                  {careItems.map(item => (
-                    <li key={item.id}>
-                      <span className="care-item-name">{item.brand} {item.name}</span>
-                      <span className="care-item-note">{item.care_instructions}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          <div className="modal-footer">
-            <button type="submit" className="btn btn-primary w-full" disabled={!valid}>
-              Enviar a lavar
-            </button>
-          </div>
-        </form>
+    <div className="apply-screen" role="dialog" aria-modal="true">
+      {/* ── Header ── */}
+      <div className="apply-header">
+        <button type="button" className="apply-back" onClick={onClose} aria-label="Volver">
+          ←
+        </button>
+        <div className="apply-header-info">
+          <span className="apply-header-name" style={{ color: preset.color }}>{preset.name}</span>
+          {preset.subtitle && <span className="apply-header-sub">{preset.subtitle}</span>}
+        </div>
+        <div
+          className="apply-header-dot"
+          style={{ background: preset.color }}
+        />
       </div>
+
+      {/* ── Body ── */}
+      <form onSubmit={handleSubmit} className="apply-body">
+
+        {/* Weight source indicator */}
+        <div className={`apply-weight-row ${weightInfo ? (isFresh ? 'weight-fresh' : 'weight-stale') : 'weight-none'}`}>
+          <span className="weight-source-dot" />
+          {weightInfo ? (
+            <>
+              <span className="weight-source-val">{weightInfo.lbs.toFixed(1)} lbs</span>
+              <span className="weight-source-meta">
+                {(weightInfo.lbs / 2.20462).toFixed(2)} kg · {timeAgo(weightInfo.receivedAt)}
+                {!isFresh && <span className="weight-source-stale-note"> — desactualizado</span>}
+              </span>
+            </>
+          ) : (
+            <span className="weight-source-meta muted">Sin peso de báscula</span>
+          )}
+        </div>
+
+        {/* Stepper */}
+        <div className="weight-stepper">
+          <button type="button" className="stepper-btn stepper-minus" onClick={() => adjust(-LB_STEP)} disabled={lbs !== null && lbs <= 1}>−</button>
+          <div className="stepper-display">
+            {lbs !== null
+              ? <>
+                  <span className="stepper-num">{lbs.toFixed(0)}</span>
+                  <span className="stepper-unit">lbs</span>
+                  <span className="stepper-lbs">{(lbs / 2.20462).toFixed(2)} kg</span>
+                </>
+              : <span className="stepper-placeholder">— lbs</span>
+            }
+          </div>
+          <button type="button" className="stepper-btn stepper-plus" onClick={() => adjust(+LB_STEP)} disabled={lbs !== null && lbs >= 66}>+</button>
+        </div>
+
+        {/* Detergent result */}
+        <div className="apply-det-row">
+          <div className="apply-det-num">{valid ? ml : '—'}</div>
+          <div className="apply-det-meta">
+            <span className="apply-det-unit">ml</span>
+            <span className="apply-det-label">{detergent.emoji} {detergent.label}</span>
+          </div>
+        </div>
+
+        {/* Care warnings — compact chips */}
+        {careItems.length > 0 && (
+          <div className="apply-care-row">
+            <span className="apply-care-icon">⚠️</span>
+            <div className="apply-care-chips">
+              {careItems.map(item => (
+                <span key={item.id} className="apply-care-chip" title={item.care_instructions}>
+                  {item.brand} {item.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CTA */}
+        <button type="submit" className="apply-cta" disabled={!valid}>
+          Enviar a lavar
+        </button>
+
+      </form>
     </div>
   );
 }

@@ -178,19 +178,30 @@ export default function App() {
   const lastAppliedPreset = useRef(null); // { id, name } of the last confirmed preset
 
   // Detect running → finished transition
+  // machineState values (standard): "run" | "stop" | "pause"
+  // washerJobState values: "wash" | "rinse" | "spin" | "finish" | "none" |
+  //   "weightSensing" | "wrinklePrevent" | "drying" | "cooling" | "airWash" | "delayWash"
   useEffect(() => {
     if (!status) return;
     const main = status?.components?.main ?? {};
-    const state = main['washerOperatingState']?.washerJobState?.value
-      ?? main['washerOperatingState']?.machineState?.value ?? 'unknown';
-    const s = state.toLowerCase();
-    const isRunning = s.includes('run') || s.includes('wash') || s.includes('spin') || s.includes('rinse');
-    const isFinished = s.includes('end') || s.includes('finish') || s.includes('stop');
+    const jobState     = main['washerOperatingState']?.washerJobState?.value ?? 'unknown';
+    const machineState = main['washerOperatingState']?.machineState?.value   ?? 'unknown';
+
+    // A cycle is active when machineState=run or jobState is an active job
+    const ACTIVE_JOB_STATES = ['wash', 'rinse', 'spin', 'drying', 'cooling', 'airWash',
+                               'weightSensing', 'pre_wash', 'prewash'];
+    const isRunning  = machineState === 'run' || ACTIVE_JOB_STATES.includes(jobState);
+    // Cycle is done when machineState=stop AND jobState is none/finish/wrinklePrevent
+    const DONE_STATES = ['none', 'finish', 'wrinklePrevent'];
+    const isFinished = machineState === 'stop' && DONE_STATES.includes(jobState);
+
     const prev = lastWasherState.current;
-    lastWasherState.current = s;
-    if (prev && !prev.includes('unknown') && isFinished) {
-      const wasRunning = prev.includes('run') || prev.includes('wash') || prev.includes('spin') || prev.includes('rinse');
-      if (wasRunning && lastAppliedPreset.current) {
+    lastWasherState.current = { machineState, jobState };
+
+    if (prev && isFinished) {
+      const prevWasRunning = prev.machineState === 'run'
+        || ACTIVE_JOB_STATES.includes(prev.jobState);
+      if (prevWasRunning && lastAppliedPreset.current) {
         setWashDone(lastAppliedPreset.current);
       }
     }

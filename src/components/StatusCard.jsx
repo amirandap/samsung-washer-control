@@ -3,9 +3,15 @@ import { cycleLabel, tempLabel, spinLabel } from '../constants.js';
 
 function parseStatus(data) {
   const main = data?.components?.main ?? {};
-  const state      = main['washerOperatingState']?.washerJobState?.value
-    ?? main['samsungce.washerOperatingState']?.washerJobState?.value
-    ?? main['washerOperatingState']?.machineState?.value ?? 'unknown';
+  // jobState (camelCase): wash | rinse | spin | finish | none | weightSensing | wrinklePrevent | drying | cooling | airWash | delayWash | ...
+  // machineState: run | stop | pause
+  const jobState     = main['washerOperatingState']?.washerJobState?.value ?? 'unknown';
+  const machineState = main['washerOperatingState']?.machineState?.value   ?? 'unknown';
+  // Use jobState when meaningful (not none/unknown), otherwise fall back to machineState
+  const state = (jobState !== 'none' && jobState !== 'unknown') ? jobState : machineState;
+  // Remaining time from Samsung extension (minutes)
+  const remainingMin = main['samsungce.washerOperatingState']?.remainingTime?.value ?? null;
+  const progressPct  = main['samsungce.washerOperatingState']?.progress?.value      ?? null;
   // Cycle: cycleType = allInOne / washingOnly / dryingOnly
   const cycle      = main['samsungce.washerCycle']?.cycleType?.value
     ?? main['custom.washerWashCourse']?.washerWashCourse?.value;
@@ -17,12 +23,11 @@ function parseStatus(data) {
   // remoteControlEnabled arrives as string "true"/"false"
   const remoteRaw  = main['remoteControlStatus']?.remoteControlEnabled?.value;
   const remoteEnabled = remoteRaw === true || remoteRaw === 'true';
-  const completionTime = main['washerOperatingState']?.completionTime?.value
-    ?? main['samsungce.washerOperatingState']?.completionTime?.value ?? null;
+  const completionTime = main['washerOperatingState']?.completionTime?.value ?? null;
   // EcoBubble = washerBubbleSoak on this model
   const eco        = main['samsungce.washerBubbleSoak']?.status?.value
     ?? main['samsungce.ecoBubble']?.ecoBubble?.value ?? null;
-  return { state, cycle, temp, spin, remoteEnabled, completionTime, eco };
+  return { state, jobState, machineState, remainingMin, progressPct, cycle, temp, spin, remoteEnabled, completionTime, eco };
 }
 
 function timeLeft(completionTime) {
@@ -38,12 +43,17 @@ function timeLeft(completionTime) {
 }
 
 function stateBadgeProps(state) {
-  const s = (state ?? '').toLowerCase();
-  if (s.includes('run') || s.includes('wash') || s.includes('spin') || s.includes('rinse'))
+  // machineState: run | stop | pause
+  // washerJobState: wash | rinse | spin | drying | cooling | airWash | weightSensing | finish | wrinklePrevent | none
+  const ACTIVE_STATES  = ['run', 'wash', 'rinse', 'spin', 'drying', 'cooling',
+                          'airWash', 'weightSensing', 'delayWash', 'pre_wash', 'prewash'];
+  const DONE_STATES    = ['finish', 'wrinklePrevent', 'stop'];
+  const s = state ?? 'unknown';
+  if (ACTIVE_STATES.includes(s))
     return { cls: 'badge-running', label: 'En marcha', dot: 'dot dot-pulse' };
-  if (s.includes('pause'))
+  if (s === 'pause')
     return { cls: 'badge-paused', label: 'Pausado', dot: 'dot dot-grey' };
-  if (s.includes('end') || s.includes('finish') || s.includes('stop'))
+  if (DONE_STATES.includes(s))
     return { cls: 'badge-end', label: 'Terminado', dot: 'dot dot-grey' };
   if (s === 'unknown')
     return { cls: 'badge-idle', label: 'Cargando…', dot: 'dot dot-grey' };
@@ -53,7 +63,12 @@ function stateBadgeProps(state) {
 export default function StatusCard({ status, error, nextRefresh, onRefresh }) {
   const [open, setOpen] = useState(false);
   const parsed = status ? parseStatus(status) : null;
-  const tl     = parsed ? timeLeft(parsed.completionTime) : null;
+  // Prefer remainingMin from Samsung extension (live countdown), fallback to completionTime ISO
+  const tl     = parsed
+    ? (parsed.remainingMin != null
+        ? (parsed.remainingMin <= 0 ? 'Terminado' : `${parsed.remainingMin}m`)
+        : timeLeft(parsed.completionTime))
+    : null;
   const { cls, label, dot } = stateBadgeProps(parsed?.state);
   const isRunning = cls === 'badge-running';
 

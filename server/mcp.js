@@ -191,14 +191,21 @@ server.tool(
     const main   = status?.components?.main ?? {};
 
     // Parse into a readable summary
-    const state      = main['washerOperatingState']?.washerJobState?.value  ?? main['washerOperatingState']?.machineState?.value ?? 'unknown';
+    const machineState = main['washerOperatingState']?.machineState?.value    ?? 'unknown';
+    const jobState     = main['washerOperatingState']?.washerJobState?.value  ?? 'unknown';
+    const progress     = main['samsungce.washerOperatingState']?.progress?.value ?? null;
+    const remainingMin = main['samsungce.washerOperatingState']?.remainingTime?.value ?? null;
+    const operatingState = main['samsungce.washerOperatingState']?.operatingState?.value ?? null;
     const cycle      = main['custom.washerWashCourse']?.washerWashCourse?.value ?? 'unknown';
     const temp       = main['custom.washerWashTemperature']?.washerWashTemperature?.value ?? 'unknown';
     const spin       = main['custom.washerSpinLevel']?.washerSpinLevel?.value ?? 'unknown';
     const remote     = main['remoteControlStatus']?.remoteControlEnabled?.value ?? null;
     const completion = main['washerOperatingState']?.completionTime?.value ?? null;
+    const energyWh   = main['powerConsumptionReport']?.powerConsumption?.value?.energy ?? null;
+    const waterL     = (main['samsungce.waterConsumptionReport']?.waterConsumption?.value?.cumulativeAmount ?? null) !== null
+      ? (main['samsungce.waterConsumptionReport'].waterConsumption.value.cumulativeAmount / 1000) : null;
 
-    return text({ state, cycle, temp, spin, remoteEnabled: remote, completionTime: completion, raw: main });
+    return text({ machineState, jobState, operatingState, progress, remainingMin, cycle, temp, spin, remoteEnabled: remote, completionTime: completion, energyWh, waterL, raw: main });
   }
 );
 

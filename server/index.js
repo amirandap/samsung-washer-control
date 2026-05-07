@@ -257,12 +257,14 @@ app.get('/api/presets/:id', (req, res) => {
 });
 
 app.post('/api/presets', (req, res) => {
-  const { name, subtitle, cycle, temp, spin_rpm, eco, color, clothes, compat_colors, notes } = req.body ?? {};
+  const { name, subtitle, cycle, temp, spin_rpm, eco, color, clothes, compat_colors, notes,
+          dry_cycle, dry_temp, dry_notes, detergent_type, sort_order } = req.body ?? {};
   if (!name || !cycle || !temp) {
     return res.status(400).json({ error: 'name, cycle and temp are required' });
   }
   try {
-    const preset = createPreset({ name, subtitle, cycle, temp, spin_rpm, eco, color, clothes, compat_colors, notes });
+    const preset = createPreset({ name, subtitle, cycle, temp, spin_rpm, eco, color, clothes,
+      compat_colors, notes, dry_cycle, dry_temp, dry_notes, detergent_type, sort_order });
     res.status(201).json(preset);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -419,8 +421,26 @@ app.post('/api/webhook/scale', (req, res) => {
   const lbs         = kg * 2.20462;
   const emitSource  = ['ha', 'esphome'].includes(req.body?.source) ? req.body.source : 'ha';
   console.log(`[scale-webhook] weight from ${emitSource}: ${lbs.toFixed(1)} lbs (${kg.toFixed(2)} kg)`);
+  // Persist last weight so ApplyModal can show it even when SSE was not open
+  setConfig('last_scale_weight_kg', String(kg));
+  setConfig('last_scale_weight_at', new Date().toISOString());
   scaleHA.emit('weight', { weight_kg: kg, source: emitSource });
   res.json({ ok: true, weight_lbs: +lbs.toFixed(1), weight_kg: +kg.toFixed(3), source: emitSource });
+});
+
+// GET /api/scale/last-weight — returns last weight received from any source
+app.get('/api/scale/last-weight', (_req, res) => {
+  const kg_str = getConfig('last_scale_weight_kg');
+  const at_str = getConfig('last_scale_weight_at');
+  if (!kg_str || !at_str) return res.json({ available: false });
+  const kg  = parseFloat(kg_str);
+  if (!isFinite(kg)) return res.json({ available: false });
+  res.json({
+    available:  true,
+    weight_kg:  +kg.toFixed(3),
+    weight_lbs: +(kg * 2.20462).toFixed(1),
+    received_at: at_str,
+  });
 });
 
 // ════════════════════════════════════════════════════
@@ -488,7 +508,12 @@ app.get('/api/scale/stream', (req, res) => {
 
   // Wire up listeners — BLE (scaleManager) + webhook (scaleHA: ha/esphome)
   const onReading  = (d) => send('reading', d);
-  const onWeight   = (d) => send('weight',  d);
+  const onWeight   = (d) => {
+    // Persist last weight for ApplyModal prefill
+    setConfig('last_scale_weight_kg', String(d.weight_kg));
+    setConfig('last_scale_weight_at', new Date().toISOString());
+    send('weight', d);
+  };
   const onStatus   = (d) => send('status',  d);
   const onHaWeight = (d) => send('weight',  d);
 

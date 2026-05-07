@@ -84,6 +84,7 @@ server.tool(
     dry_cycle:  z.string().optional().describe('Dryer cycle to use after washing, if applicable. E.g. "normal", "delicates", "air" — leave empty if no drying'),
     dry_temp:   z.string().optional().describe('Dryer temperature setting. E.g. "low", "medium", "high" — use "low" for synthetics/delicates'),
     dry_notes:  z.string().optional().describe('Special drying instructions for this preset. E.g. "Sacar a medio ciclo y colgar", "No aplica — tender al aire"'),
+    detergent_type: z.enum(['regular','dark','colors','whites','delicate','sport']).optional().default('regular').describe('Detergent type for dose display: regular=normal all-purpose, dark=ropa negra/oscura, colors=ropa de color, whites=blancos/cloro, delicate=delicados, sport=ropa deportiva'),
   },
   async (data) => {
     const preset = createPreset(data);
@@ -110,6 +111,7 @@ server.tool(
     dry_cycle:  z.string().optional().describe('Dryer cycle after washing'),
     dry_temp:   z.string().optional().describe('Dryer temperature setting'),
     dry_notes:  z.string().optional().describe('Special drying instructions — shown to user at wash time if set'),
+    detergent_type: z.enum(['regular','dark','colors','whites','delicate','sport']).optional().describe('Detergent type: regular, dark, colors, whites, delicate, sport'),
   },
   async ({ id, ...fields }) => {
     const updated = updatePreset(id, fields);

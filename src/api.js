@@ -52,6 +52,7 @@ export const api = {
   getScaleSource:        ()             => req('GET',    '/scale/source'),
   setScaleSource:        (source)       => req('POST',   '/scale/source', { source }),
   getWebhookInfo:        ()             => req('GET',    '/webhook/scale/info'),
+  getLastScaleWeight:    ()             => req('GET',    '/scale/last-weight'),
   /** Returns an EventSource. Usage: const es = api.scaleStream(); es.onmessage = ... */
   scaleStream:           ()             => new EventSource(`${API_BASE}/scale/stream`),
 

@@ -48,6 +48,7 @@ try { db.exec(`ALTER TABLE presets ADD COLUMN compat_colors TEXT NOT NULL DEFAUL
 try { db.exec(`ALTER TABLE presets ADD COLUMN dry_cycle TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 try { db.exec(`ALTER TABLE presets ADD COLUMN dry_temp TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 try { db.exec(`ALTER TABLE presets ADD COLUMN dry_notes TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE presets ADD COLUMN detergent_type TEXT NOT NULL DEFAULT 'regular'`); } catch (_) { /* already exists */ }
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS clothing_items (
@@ -91,8 +92,8 @@ export const presetQueries = {
   get: db.prepare('SELECT * FROM presets WHERE id = ?'),
 
   create: db.prepare(`
-    INSERT INTO presets (id, name, subtitle, cycle, temp, spin_rpm, eco, color, clothes, compat_colors, notes, dry_cycle, dry_temp, dry_notes, sort_order)
-    VALUES (@id, @name, @subtitle, @cycle, @temp, @spin_rpm, @eco, @color, @clothes, @compat_colors, @notes, @dry_cycle, @dry_temp, @dry_notes, @sort_order)
+    INSERT INTO presets (id, name, subtitle, cycle, temp, spin_rpm, eco, color, clothes, compat_colors, notes, dry_cycle, dry_temp, dry_notes, detergent_type, sort_order)
+    VALUES (@id, @name, @subtitle, @cycle, @temp, @spin_rpm, @eco, @color, @clothes, @compat_colors, @notes, @dry_cycle, @dry_temp, @dry_notes, @detergent_type, @sort_order)
   `),
 
   update: db.prepare(`
@@ -101,6 +102,7 @@ export const presetQueries = {
         spin_rpm = @spin_rpm, eco = @eco, color = @color, clothes = @clothes,
         compat_colors = @compat_colors, notes = @notes,
         dry_cycle = @dry_cycle, dry_temp = @dry_temp, dry_notes = @dry_notes,
+        detergent_type = @detergent_type,
         sort_order = @sort_order, updated_at = CURRENT_TIMESTAMP
     WHERE id = @id
   `),
@@ -162,6 +164,7 @@ export function createPreset(data) {
     dry_cycle:     data.dry_cycle  ?? '',
     dry_temp:      data.dry_temp   ?? '',
     dry_notes:     data.dry_notes  ?? '',
+    detergent_type: data.detergent_type ?? 'regular',
     sort_order: data.sort_order ?? (maxOrder.m !== null ? maxOrder.m + 1 : 0),
   });
   return getPreset(id);
@@ -185,6 +188,7 @@ export function updatePreset(id, data) {
     dry_cycle:     data.dry_cycle    !== undefined ? data.dry_cycle : (existing.dry_cycle ?? ''),
     dry_temp:      data.dry_temp     !== undefined ? data.dry_temp  : (existing.dry_temp  ?? ''),
     dry_notes:     data.dry_notes    !== undefined ? data.dry_notes : (existing.dry_notes ?? ''),
+    detergent_type: data.detergent_type !== undefined ? data.detergent_type : (existing.detergent_type ?? 'regular'),
     sort_order: data.sort_order ?? existing.sort_order,
   });
   return getPreset(id);

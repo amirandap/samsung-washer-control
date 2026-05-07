@@ -74,6 +74,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .btn-primary { background: var(--accent);   color: #fff;       font-weight: 600; padding: 10px 20px; font-size: .92rem; }
 .btn-ghost   { background: transparent;     color: var(--muted); border: 1px solid var(--border); font-size: .85rem; padding: 7px 14px; }
 .btn-ghost:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+.btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: 500; padding: 7px 14px; font-size: .85rem; }
+.btn-outline:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .btn-sm      { padding: 6px 14px; font-size: .82rem; }
 .btn-xs      { padding: 4px 10px; font-size: .78rem; }
 .btn-icon    { background: transparent; color: var(--muted); padding: 4px 6px; font-size: 1rem; }
@@ -500,6 +502,36 @@ input[type="color"] { padding: 3px 4px; height: 36px; width: 36px; cursor: point
   margin-top: 4px;
   padding: 0 2px;
   opacity: .85;
+}
+
+/* Last scale weight banner */
+.last-weight-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: .85rem;
+}
+.last-weight-info { flex: 1; color: var(--text); }
+.last-weight-ago  { color: var(--muted); font-size: .78rem; }
+.last-weight-use  { white-space: nowrap; font-size: .8rem; padding: 3px 10px; }
+
+/* Detergent type badge */
+.det-type-badge {
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 .scale-live-weight { font-size: 2.6rem; font-weight: 700; line-height: 1; letter-spacing: -1px; color: var(--text); }
 .scale-live-num { color: var(--accent); }

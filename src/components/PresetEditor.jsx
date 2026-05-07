@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CYCLES, TEMPS, SPINS, CLOTHES_TYPES, COLOR_SWATCHES, DRY_CYCLES, DRY_TEMPS, parseCompatColors, formatCompatColors } from '../constants.js';
+import { CYCLES, TEMPS, SPINS, CLOTHES_TYPES, COLOR_SWATCHES, DRY_CYCLES, DRY_TEMPS, DETERGENT_TYPES, parseCompatColors, formatCompatColors } from '../constants.js';
 
 const COLOR_PRESETS = ['#e74c3c','#e67e22','#f1c40f','#c9a84c','#2ecc71','#1abc9c','#3498db','#2471a3','#9b59b6','#95a5a6','#7f8c8d'];
 
@@ -18,6 +18,7 @@ export default function PresetEditor({ preset, onSave, onClose }) {
     dry_cycle: preset?.dry_cycle ?? '',
     dry_temp:  preset?.dry_temp  ?? '',
     dry_notes: preset?.dry_notes ?? '',
+    detergent_type: preset?.detergent_type ?? 'regular',
     sort_order:preset?.sort_order ?? 99,
   });
   const [saving, setSaving] = useState(false);
@@ -177,6 +178,16 @@ export default function PresetEditor({ preset, onSave, onClose }) {
               rows={3}
               placeholder="Ej. Usar para ropa de deporte sintética, no mezclar con algodón…"
             />
+          </div>
+
+          {/* Detergent type */}
+          <div className="field">
+            <label>Tipo de detergente</label>
+            <select value={form.detergent_type} onChange={e => set('detergent_type', e.target.value)}>
+              {DETERGENT_TYPES.map(d => (
+                <option key={d.value} value={d.value}>{d.emoji} {d.label}</option>
+              ))}
+            </select>
           </div>
 
           {/* Drying */}

@@ -33,6 +33,10 @@ export const CYCLE_LABELS = {
   rinseHoldCourse:     'Enjuague + Pausa',
   sportsCourse:        'Deporte',
   outerWear:           'Ropa exterior',
+  // samsungce.washerCycle cycleType values
+  allInOne:            'Lavar + Secar',
+  washingOnly:         'Solo lavado',
+  dryingOnly:          'Solo secado',
 };
 
 // ── Temperature labels ────────────────────────────────────────────────────────
@@ -41,6 +45,14 @@ export const TEMP_LABELS = {
   warm:     '40 °C — Tibio',
   hot:      '60 °C — Caliente',
   extraHot: '90 °C — Muy caliente',
+  // numeric string values from custom.washerWaterTemperature
+  none:     '—',
+  '20':     '20 °C',
+  '30':     '30 °C',
+  '40':     '40 °C',
+  '50':     '50 °C',
+  '60':     '60 °C',
+  '90':     '90 °C',
 };
 
 export const TEMP_SHORT = {
@@ -53,17 +65,34 @@ export const TEMP_SHORT = {
 // ── Spin labels ───────────────────────────────────────────────────────────────
 export const SPIN_LABELS = {
   no:        'Sin centri.',
+  noSpin:    'Sin centri.',
   rinseHold: '~600 rpm',
   low:       '~600 rpm',
   medium:    '800 rpm',
   high:      '1000 rpm',
   extraHigh: '1200 rpm',
-  // stored numeric
-  600:       '600 rpm',
-  800:       '800 rpm',
-  1000:      '1000 rpm',
-  1200:      '1200 rpm',
+  // stored as string keys
+  '400':     '400 rpm',
+  '600':     '600 rpm',
+  '800':     '800 rpm',
+  '1000':    '1000 rpm',
+  '1200':    '1200 rpm',
+  '1400':    '1400 rpm',
 };
+
+// ── Detergent types ───────────────────────────────────────────────────────────
+export const DETERGENT_TYPES = [
+  { value: 'regular',  label: 'Normal',           emoji: '🧴' },
+  { value: 'dark',     label: 'Oscuros / Negros', emoji: '🖤' },
+  { value: 'colors',   label: 'Colores',          emoji: '🌈' },
+  { value: 'whites',   label: 'Blancos / Cloro',  emoji: '🤍' },
+  { value: 'delicate', label: 'Delicados',        emoji: '🌸' },
+  { value: 'sport',    label: 'Deporte',          emoji: '👟' },
+];
+
+export function detergentLabel(type) {
+  return DETERGENT_TYPES.find(d => d.value === type) ?? DETERGENT_TYPES[0];
+}
 
 // ── Clothes types ─────────────────────────────────────────────────────────────
 export const CLOTHES_TYPES = [

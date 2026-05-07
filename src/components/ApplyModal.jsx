@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
+import { detergentLabel } from '../constants.js';
 
 const LB_STEP  = 1;
 
@@ -26,6 +27,17 @@ function DetergentBar({ ml, max = 150 }) {
       <span className="det-bar-label" style={{ color }}>{ml} ml</span>
     </div>
   );
+}
+
+function timeAgo(isoString) {
+  if (!isoString) return '';
+  const diffSec = Math.floor((Date.now() - new Date(isoString)) / 1000);
+  if (diffSec < 60)  return 'hace un momento';
+  const m = Math.floor(diffSec / 60);
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h}h`;
+  return `hace ${Math.floor(h / 24)}d`;
 }
 
 // ── Scale live-view widget ────────────────────────────────────────────────────
@@ -135,7 +147,17 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
   // lbs is the display unit; kg is derived for detergent calculation
   const [lbs, setLbs]       = useState(null);
   const [useScale, setUseScale] = useState(true);
+  // Last weight received from scale (even if SSE wasn't open)
+  const [lastWeight, setLastWeight] = useState(null); // { lbs, kg, receivedAt }
   const careItems = (preset.clothing_items ?? []).filter(i => i.care_instructions?.trim());
+  const detergent = detergentLabel(preset.detergent_type);
+
+  // Fetch last stored weight on mount
+  useEffect(() => {
+    api.getLastScaleWeight().then(d => {
+      if (d.available) setLastWeight({ lbs: d.weight_lbs, kg: d.weight_kg, receivedAt: d.received_at });
+    }).catch(() => {});
+  }, []);
 
   const kg    = lbs !== null ? lbs / 2.20462 : null;
   const ml    = kg  !== null ? calcDetergent(kg, preset) : null;
@@ -170,6 +192,21 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
               onClick={() => setUseScale(false)}>✏️ Manual</button>
           </div>
 
+          {/* ── Last received weight banner ── */}
+          {lastWeight && lbs === null && (
+            <div className="last-weight-banner">
+              <span className="last-weight-info">
+                Último peso: <strong>{lastWeight.lbs} lbs</strong>
+                <span className="last-weight-ago"> · {timeAgo(lastWeight.receivedAt)}</span>
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline last-weight-use"
+                onClick={() => setLbs(Math.round(lastWeight.lbs))}
+              >Usar</button>
+            </div>
+          )}
+
           {/* ── Scale live view ── */}
           {useScale && (
             <ScaleLive onWeight={(w) => setLbs(Math.round(w))} />
@@ -195,7 +232,9 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
           {/* ── Detergent result ── */}
           {valid && (
             <div className="det-result">
-              <div className="det-result-title">🧴 Dosis de detergente</div>
+              <div className="det-result-title">
+                {detergent.emoji} Detergente <span className="det-type-badge">{detergent.label}</span>
+              </div>
               <DetergentBar ml={ml} />
               <ul className="det-hints">
                 {preset.eco && <li>🫧 EcoBubble activo — dosis reducida 15 %</li>}

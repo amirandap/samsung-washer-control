@@ -4,13 +4,24 @@ import { cycleLabel, tempLabel, spinLabel } from '../constants.js';
 function parseStatus(data) {
   const main = data?.components?.main ?? {};
   const state      = main['washerOperatingState']?.washerJobState?.value
+    ?? main['samsungce.washerOperatingState']?.washerJobState?.value
     ?? main['washerOperatingState']?.machineState?.value ?? 'unknown';
-  const cycle      = main['custom.washerWashCourse']?.washerWashCourse?.value;
-  const temp       = main['custom.washerWashTemperature']?.washerWashTemperature?.value;
+  // Cycle: cycleType = allInOne / washingOnly / dryingOnly
+  const cycle      = main['samsungce.washerCycle']?.cycleType?.value
+    ?? main['custom.washerWashCourse']?.washerWashCourse?.value;
+  // Temperature: arrives as numeric string "40" (Celsius) or named "cold"
+  const temp       = main['custom.washerWaterTemperature']?.washerWaterTemperature?.value
+    ?? main['custom.washerWashTemperature']?.washerWashTemperature?.value;
+  // Spin: arrives as numeric string "1400" (RPM)
   const spin       = main['custom.washerSpinLevel']?.washerSpinLevel?.value;
-  const remoteEnabled = main['remoteControlStatus']?.remoteControlEnabled?.value ?? null;
-  const completionTime = main['washerOperatingState']?.completionTime?.value ?? null;
-  const eco        = main['samsungce.ecoBubble']?.ecoBubble?.value ?? null;
+  // remoteControlEnabled arrives as string "true"/"false"
+  const remoteRaw  = main['remoteControlStatus']?.remoteControlEnabled?.value;
+  const remoteEnabled = remoteRaw === true || remoteRaw === 'true';
+  const completionTime = main['washerOperatingState']?.completionTime?.value
+    ?? main['samsungce.washerOperatingState']?.completionTime?.value ?? null;
+  // EcoBubble = washerBubbleSoak on this model
+  const eco        = main['samsungce.washerBubbleSoak']?.status?.value
+    ?? main['samsungce.ecoBubble']?.ecoBubble?.value ?? null;
   return { state, cycle, temp, spin, remoteEnabled, completionTime, eco };
 }
 
@@ -99,9 +110,9 @@ export default function StatusCard({ status, error, nextRefresh, onRefresh }) {
               <div className="stat-item">
                 <div className="stat-label">Smart Control</div>
                 <div className="stat-value">
-                  {parsed?.remoteEnabled === true  && <span className="text-success">✔ Sí</span>}
-                  {parsed?.remoteEnabled === false && <span className="text-danger">✘ No</span>}
-                  {parsed?.remoteEnabled === null  && '—'}
+                  {parsed?.remoteEnabled
+                    ? <span className="text-success">✔ Sí</span>
+                    : <span className="text-danger">✘ No</span>}
                 </div>
               </div>
               <div className="stat-item">

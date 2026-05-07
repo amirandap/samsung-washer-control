@@ -49,14 +49,40 @@ export default function App() {
       try {
         const cfg = await api.getConfig();
 
-        // OAuth configured but no active token → redirect silently, no flash
-        if (cfg.oauthConfigured && !cfg.oauthConnected) {
-          window.location.href = api.oauthAuthorizeUrl();
+        setAuthMode(cfg.authMode ?? 'pat');
+
+        // OAuth configured → try to refresh silently before anything else.
+        // We NEVER show SetupPanel if OAuth is configured — worst case we redirect
+        // to the SmartThings auth page (which completes automatically if still logged in).
+        if (cfg.oauthConfigured) {
+          if (!cfg.oauthConnected || (cfg.oauthExpiresAt && Date.now() > cfg.oauthExpiresAt)) {
+            // Token missing or expired — ask server to refresh
+            try {
+              await api.refreshOAuth();
+            } catch {
+              // Refresh token also expired → must re-auth via browser (no flash/modal)
+              window.location.href = api.oauthAuthorizeUrl();
+              return;
+            }
+          }
+          // Re-fetch config after potential refresh
+          const fresh = await api.getConfig();
+          if (!fresh.token || !fresh.deviceId) {
+            // OAuth connected but device not discovered yet — can't do much
+            setConfigLoading(false);
+            return;
+          }
+          const [presetsData, statusData] = await Promise.all([
+            api.listPresetsWithClothing(),
+            api.getStatus().catch(err => { setStatusErr(err.message); return null; }),
+          ]);
+          setPresets(presetsData);
+          if (statusData) setStatus(statusData);
+          setConfigured(true);
           return;
         }
 
-        setAuthMode(cfg.authMode ?? 'pat');
-
+        // PAT mode
         if (!cfg.token || !cfg.deviceId) {
           setConfigLoading(false);
           return;
@@ -66,9 +92,7 @@ export default function App() {
         const [presetsData, statusData] = await Promise.all([
           api.listPresetsWithClothing(),
           api.getStatus().catch(err => {
-            // 401 = token invalid; re-auth if OAuth, otherwise show setup
             if (err.status === 401) throw err;
-            // Non-auth error: show app but with status error
             setStatusErr(err.message);
             return null;
           }),
@@ -79,14 +103,13 @@ export default function App() {
         setConfigured(true);
       } catch (err) {
         if (err.status === 401) {
-          // Token invalid — try to re-auth via OAuth silently
           try {
             const cfg = await api.getConfig();
             if (cfg.oauthConfigured) {
               window.location.href = api.oauthAuthorizeUrl();
               return;
             }
-          } catch (_) { /* fall through to setup */ }
+            } catch { /* fall through to setup */ }
         }
         // Not configured or unrecoverable → show setup
       } finally {
@@ -98,10 +121,11 @@ export default function App() {
 
   // ── Reload presets (used after create/edit/delete) ────────────
   const loadPresets = useCallback(() => {
-    api.listPresetsWithClothing().then(setPresets).catch(console.error);
+    api.listPresetsWithClothing().then(setPresets).catch(() => {});
   }, []);
 
   // ── Status polling ─────────────────────────────────
+  const fetchStatusRef = useRef(null);
   const fetchStatus = useCallback(async () => {
     try {
       const data = await api.getStatus();
@@ -110,15 +134,25 @@ export default function App() {
     } catch (err) {
       setStatusErr(err.message);
       if (err.status === 401) {
-        // Silently re-auth if OAuth, otherwise drop to setup
-        api.getConfig().then(cfg => {
-          if (cfg.oauthConfigured) window.location.href = api.oauthAuthorizeUrl();
-          else setConfigured(false);
+        // Try server-side refresh first; only redirect to OAuth if that fails
+        api.getConfig().then(async cfg => {
+          if (cfg.oauthConfigured) {
+            try {
+              await api.refreshOAuth();
+              // Refresh worked — retry status immediately
+              fetchStatusRef.current?.();
+            } catch {
+              window.location.href = api.oauthAuthorizeUrl();
+            }
+          } else {
+            setConfigured(false);
+          }
         }).catch(() => setConfigured(false));
       }
     }
     setNextRefresh(30);
   }, []);
+  useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
 
   const refreshRef = useRef(null);
   const countdownRef = useRef(null);
@@ -170,7 +204,7 @@ export default function App() {
     setApplyTarget(preset);
   }, []);
 
-  const confirmApply = useCallback(async ({ lbs, kg, ml }) => {
+  const confirmApply = useCallback(async ({ lbs, kg: _kg, ml }) => {
     const preset = applyTarget;
     setApplyTarget(null);
     setApplying(preset.id);

@@ -16,7 +16,7 @@ import {
 import { scaleManager } from './scale.js';
 import {
   buildAuthUrl, createOAuthState, consumeOAuthState,
-  exchangeCode, storeTokens, refreshOAuthToken, getValidToken,
+  exchangeCode, storeTokens, refreshOAuthToken, getValidToken, callWithRefresh,
 } from './oauth.js';
 
 const APP_BASE = (process.env.VITE_BASE_PATH || '').replace(/\/$/, ''); // e.g. '/lavadora'
@@ -32,7 +32,7 @@ app.use(express.json());
 app.use(express.static(join(__dirname, '..', 'dist')));
 
 // ── Bootstrap: persist env token into DB if not already stored ─
-if (process.env.SMARTTHINGS_TOKEN && !getConfig('token') && !getConfig('oauth_access_token')) {
+if (process.env.SMARTTHINGS_TOKEN && !getConfig('oauth_client_id')) {
   setConfig('token', process.env.SMARTTHINGS_TOKEN);
   console.log('[washer-api] token from env persisted to DB');
 }
@@ -204,11 +204,10 @@ app.post('/api/discover', async (req, res) => {
 //  DEVICE STATUS
 // ════════════════════════════════════════════════════
 app.get('/api/status', async (_req, res) => {
-  const token    = await getValidToken();
   const deviceId = getConfig('deviceId');
-  if (!token || !deviceId) return res.status(400).json({ error: 'Not configured' });
+  if (!getValidToken() || !deviceId) return res.status(400).json({ error: 'Not configured' });
   try {
-    const status = await getDeviceStatus(token, deviceId);
+    const status = await callWithRefresh(token => getDeviceStatus(token, deviceId));
     res.json(status);
   } catch (err) {
     res.status(err.status ?? 500).json({ error: err.message });
@@ -216,11 +215,10 @@ app.get('/api/status', async (_req, res) => {
 });
 
 app.get('/api/remote-status', async (_req, res) => {
-  const token    = await getValidToken();
   const deviceId = getConfig('deviceId');
-  if (!token || !deviceId) return res.status(400).json({ error: 'Not configured' });
+  if (!getValidToken() || !deviceId) return res.status(400).json({ error: 'Not configured' });
   try {
-    const enabled = await getRemoteControlStatus(token, deviceId);
+    const enabled = await callWithRefresh(token => getRemoteControlStatus(token, deviceId));
     res.json({ enabled });
   } catch (err) {
     res.status(err.status ?? 500).json({ error: err.message });
@@ -339,21 +337,20 @@ app.get('/api/presets/:id/clothing', (req, res) => {
 //  APPLY PRESET
 // ════════════════════════════════════════════════════
 app.post('/api/presets/:id/apply', async (req, res) => {
-  const token    = await getValidToken();
   const deviceId = getConfig('deviceId');
-  if (!token || !deviceId) return res.status(400).json({ error: 'Not configured' });
+  if (!getValidToken() || !deviceId) return res.status(400).json({ error: 'Not configured' });
 
   const preset = getPreset(req.params.id);
   if (!preset) return res.status(404).json({ error: 'Preset not found' });
 
   try {
-    const remoteEnabled = await getRemoteControlStatus(token, deviceId);
+    const remoteEnabled = await callWithRefresh(token => getRemoteControlStatus(token, deviceId));
     if (!remoteEnabled) {
       return res.status(403).json({ error: 'REMOTE_DISABLED' });
     }
 
-    const spinLevels = await discoverSpinLevels(token, deviceId).catch(() => null);
-    const result     = await applyPreset(token, deviceId, preset, spinLevels);
+    const spinLevels = await callWithRefresh(token => discoverSpinLevels(token, deviceId)).catch(() => null);
+    const result     = await callWithRefresh(token => applyPreset(token, deviceId, preset, spinLevels));
 
     recordHistory(preset.id, preset.name);
     res.json({ ok: true, spinCmd: result.spinCmd });

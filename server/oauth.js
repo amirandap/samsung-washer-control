@@ -18,9 +18,8 @@
 import { randomBytes } from 'crypto';
 import { getConfig, setConfig } from './db.js';
 
-const ST_AUTH_URL     = 'https://api.smartthings.com/oauth/authorize';
-const ST_TOKEN_URL    = 'https://api.smartthings.com/oauth/token';
-const TOKEN_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
+const ST_AUTH_URL  = 'https://api.smartthings.com/oauth/authorize';
+const ST_TOKEN_URL = 'https://api.smartthings.com/oauth/token';
 
 // ── In-memory CSRF state store ────────────────────────────────
 const pendingStates = new Map(); // state → { expiresAt, redirectUri, returnTo }
@@ -128,29 +127,25 @@ export function storeTokens(data) {
 }
 
 /**
- * Returns a valid access token, auto-refreshing OAuth tokens when expired.
- * Falls back to the manually-entered PAT if OAuth is not set up.
+ * Returns the currently stored token (OAuth access token or PAT).
+ * No expiry checks — refresh happens reactively on 401 via callWithRefresh.
  */
-export async function getValidToken() {
-  const accessToken  = getConfig('oauth_access_token');
-  const expiresAtStr = getConfig('oauth_token_expires_at');
+export function getValidToken() {
+  return getConfig('oauth_access_token') || getConfig('token') || null;
+}
 
-  if (accessToken && expiresAtStr) {
-    const expiresAt = Number(expiresAtStr);
-    if (Date.now() < expiresAt - TOKEN_BUFFER_MS) {
-      return accessToken; // still valid
-    }
-    // Expired or close to expiry — refresh
-    try {
-      console.log('[oauth] access token expiring soon, refreshing…');
-      return await refreshOAuthToken();
-    } catch (err) {
-      console.warn('[oauth] refresh failed:', err.message);
-      // Clear stale token so the UI shows the reconnect screen
-      setConfig('oauth_access_token', '');
-    }
+/**
+ * Calls fn(token) against SmartThings. If SmartThings returns 401,
+ * refreshes the OAuth token once and retries. Throws on second failure.
+ */
+export async function callWithRefresh(fn) {
+  const token = getValidToken();
+  try {
+    return await fn(token);
+  } catch (err) {
+    if (err.status !== 401 || !getConfig('oauth_client_id')) throw err;
+    console.log('[oauth] 401 from SmartThings — refreshing token and retrying…');
+    const newToken = await refreshOAuthToken(); // throws if no refresh token
+    return fn(newToken);
   }
-
-  // Fall back to manual PAT
-  return getConfig('token') ?? null;
 }

@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev (front → prod API)",
+      "type": "npm",
+      "script": "dev",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      },
+      "problemMatcher": [],
+      "detail": "Vite en localhost:5173, /api → http://10.0.0.111"
+    },
+    {
+      "label": "Full (front + local API)",
+      "type": "npm",
+      "script": "full",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      },
+      "problemMatcher": [],
+      "detail": "Vite + Express local en localhost:3001"
+    }
+  ]
+}

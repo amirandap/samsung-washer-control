@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n vite,api -c cyan,yellow \"vite\" \"node --env-file=.env server/index.js\"",
+    "dev": "vite",
+    "full": "concurrently -n vite,api -c cyan,yellow \"vite\" \"node --env-file=.env server/index.js\"",
     "build": "vite build",
     "build:prod": "VITE_BASE_PATH=/lavadora/ vite build",
     "preview": "node --env-file=.env server/index.js",

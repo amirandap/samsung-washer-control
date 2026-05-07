@@ -400,7 +400,7 @@ app.post('/api/webhook/scale', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { weight_kg, weight_lbs, new_state } = req.body ?? {};
+  const { weight_kg, weight_lbs, new_state, washer } = req.body ?? {};
 
   let kg;
   if (weight_lbs !== undefined) {
@@ -418,12 +418,17 @@ app.post('/api/webhook/scale', (req, res) => {
     return res.status(400).json({ error: 'Invalid or missing weight value' });
   }
 
-  const lbs         = kg * 2.20462;
-  const emitSource  = ['ha', 'esphome'].includes(req.body?.source) ? req.body.source : 'ha';
+  const lbs        = kg * 2.20462;
+  const emitSource = ['ha', 'esphome'].includes(req.body?.source) ? req.body.source : 'ha';
   console.log(`[scale-webhook] weight from ${emitSource}: ${lbs.toFixed(1)} lbs (${kg.toFixed(2)} kg)`);
   // Persist last weight so ApplyModal can show it even when SSE was not open
   setConfig('last_scale_weight_kg', String(kg));
   setConfig('last_scale_weight_at', new Date().toISOString());
+  // Persist washer state snapshot if provided alongside the weight
+  if (washer && typeof washer === 'object') {
+    setConfig('last_washer_snapshot',    JSON.stringify(washer));
+    setConfig('last_washer_snapshot_at', new Date().toISOString());
+  }
   scaleHA.emit('weight', { weight_kg: kg, source: emitSource });
   res.json({ ok: true, weight_lbs: +lbs.toFixed(1), weight_kg: +kg.toFixed(3), source: emitSource });
 });
@@ -441,6 +446,18 @@ app.get('/api/scale/last-weight', (_req, res) => {
     weight_lbs: +(kg * 2.20462).toFixed(1),
     received_at: at_str,
   });
+});
+
+// GET /api/scale/last-washer — returns last washer snapshot received alongside a weight webhook
+app.get('/api/scale/last-washer', (_req, res) => {
+  const raw = getConfig('last_washer_snapshot');
+  const at  = getConfig('last_washer_snapshot_at');
+  if (!raw || !at) return res.json({ available: false });
+  try {
+    res.json({ available: true, washer: JSON.parse(raw), received_at: at });
+  } catch {
+    res.json({ available: false });
+  }
 });
 
 // ════════════════════════════════════════════════════

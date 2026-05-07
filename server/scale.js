@@ -61,9 +61,9 @@ function parsePayload(buf) {
 
 // ── Python binary location ────────────────────────────────────
 function findPython() {
-  return process.platform === 'darwin'
-    ? '/opt/homebrew/bin/python3'   // macOS Homebrew Python 3.10+
-    : 'python3';                    // Linux: assumes python3 in PATH
+  if (process.platform === 'darwin')
+    return '/opt/homebrew/bin/python3';   // macOS Homebrew Python 3.10+
+  return '/usr/bin/python3';              // Linux: absolute path
 }
 
 // ─────────────────────────────────────────────────────────────

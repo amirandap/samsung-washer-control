@@ -31,12 +31,6 @@ app.use(express.json());
 // ── Serve built React app in production ────────────────────────
 app.use(express.static(join(__dirname, '..', 'dist')));
 
-// ── Bootstrap: persist env token into DB if not already stored ─
-if (process.env.SMARTTHINGS_TOKEN && !getConfig('oauth_client_id')) {
-  setConfig('token', process.env.SMARTTHINGS_TOKEN);
-  console.log('[washer-api] token from env persisted to DB');
-}
-
 // ════════════════════════════════════════════════════
 //  CONFIG
 // ════════════════════════════════════════════════════

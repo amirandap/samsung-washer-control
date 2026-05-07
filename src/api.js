@@ -46,9 +46,12 @@ export const api = {
   assignClothing:        (id, presetId) => req('POST',   `/clothing/${id}/assign/${presetId}`),
   listPresetClothing:    (presetId)     => req('GET',    `/presets/${presetId}/clothing`),
 
-  // Scale (BLE)
+  // Scale (BLE + HA webhook + ESPHome)
   getScaleConfig:        ()             => req('GET',    '/scale/config'),
   saveScaleConfig:       (body)         => req('POST',   '/scale/config', body),
+  getScaleSource:        ()             => req('GET',    '/scale/source'),
+  setScaleSource:        (source)       => req('POST',   '/scale/source', { source }),
+  getWebhookInfo:        ()             => req('GET',    '/webhook/scale/info'),
   /** Returns an EventSource. Usage: const es = api.scaleStream(); es.onmessage = ... */
   scaleStream:           ()             => new EventSource(`${API_BASE}/scale/stream`),
 

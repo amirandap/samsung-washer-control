@@ -483,6 +483,24 @@ input[type="color"] { padding: 3px 4px; height: 36px; width: 36px; cursor: point
 .scale-live-header { display: flex; align-items: center; gap: 7px; }
 .scale-live-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .scale-live-status { font-size: .8rem; color: var(--text); font-weight: 500; }
+.scale-live-source-badge {
+  margin-left: auto;
+  font-size: .7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.scale-live-approx-note {
+  font-size: .72rem;
+  color: var(--warn);
+  margin-top: 4px;
+  padding: 0 2px;
+  opacity: .85;
+}
 .scale-live-weight { font-size: 2.6rem; font-weight: 700; line-height: 1; letter-spacing: -1px; color: var(--text); }
 .scale-live-num { color: var(--accent); }
 .scale-live-unit { font-size: 1.2rem; color: var(--text); margin-left: 2px; }

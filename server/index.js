@@ -1,6 +1,8 @@
 import express from 'express';
 import cors    from 'cors';
 import { join, dirname } from 'path';
+import { randomBytes } from 'crypto';
+import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import {
   listPresets, getPreset, createPreset, updatePreset, deletePreset,
@@ -20,6 +22,19 @@ import {
 } from './oauth.js';
 
 const APP_BASE = (process.env.VITE_BASE_PATH || '').replace(/\/$/, ''); // e.g. '/lavadora'
+
+// ── HA webhook scale event bus ───────────────────────────────────────────────
+// HA pushes weight via POST /api/webhook/scale → emits here → picked up by SSE clients
+const scaleHA = new EventEmitter();
+
+function getWebhookSecret() {
+  let secret = getConfig('webhook_secret');
+  if (!secret) {
+    secret = randomBytes(20).toString('hex');
+    setConfig('webhook_secret', secret);
+  }
+  return secret;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT ?? 3001;
@@ -362,8 +377,62 @@ app.get('/api/history', (_req, res) => {
 });
 
 // ════════════════════════════════════════════════════
-//  SCALE (BLE)
+//  SCALE — HA WEBHOOK
 // ════════════════════════════════════════════════════
+
+// GET /api/webhook/scale/info — returns the webhook URL + secret for HA automation config
+app.get('/api/webhook/scale/info', (req, res) => {
+  const secret = getWebhookSecret();
+  const proto  = (req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() || req.protocol;
+  const host   = req.headers['x-forwarded-host'] || req.get('host');
+  const url    = `${proto}://${host}${APP_BASE}/api/webhook/scale`;
+  res.json({ url, secret, header: 'X-Webhook-Token' });
+});
+
+// POST /api/webhook/scale — called by HA automation when scale weight changes
+// Body: { weight_kg: number }  OR HA state_changed payload: { new_state: { state: "75.2", ... } }
+app.post('/api/webhook/scale', (req, res) => {
+  const secret   = getWebhookSecret();
+  const provided = req.headers['x-webhook-token'] || req.query.token;
+  if (!provided || provided !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { weight_kg, weight_lbs, new_state } = req.body ?? {};
+
+  let kg;
+  if (weight_lbs !== undefined) {
+    kg = parseFloat(weight_lbs) / 2.20462;
+  } else if (weight_kg !== undefined) {
+    kg = parseFloat(weight_kg);
+  } else {
+    // HA state_changed payload — unit_of_measurement decides conversion
+    const stateVal = parseFloat(new_state?.state);
+    const unit     = (new_state?.attributes?.unit_of_measurement ?? '').toLowerCase();
+    kg = unit.includes('lb') ? stateVal / 2.20462 : stateVal;
+  }
+
+  if (!isFinite(kg) || kg <= 0 || kg > 500) {
+    return res.status(400).json({ error: 'Invalid or missing weight value' });
+  }
+
+  const lbs         = kg * 2.20462;
+  const emitSource  = ['ha', 'esphome'].includes(req.body?.source) ? req.body.source : 'ha';
+  console.log(`[scale-webhook] weight from ${emitSource}: ${lbs.toFixed(1)} lbs (${kg.toFixed(2)} kg)`);
+  scaleHA.emit('weight', { weight_kg: kg, source: emitSource });
+  res.json({ ok: true, weight_lbs: +lbs.toFixed(1), weight_kg: +kg.toFixed(3), source: emitSource });
+});
+
+// ════════════════════════════════════════════════════
+//  SCALE — CONFIG & SOURCE
+// ════════════════════════════════════════════════════
+
+// Valid scale sources:
+//   'auto'     — try BLE first; also accept webhook pushes from HA/ESPHome
+//   'ble'      — only direct BLE stack on this server
+//   'ha'       — HA acts as BLE proxy, pushes via webhook
+//   'esphome'  — ESPHome device does BLE scan, pushes via webhook
+const VALID_SOURCES = ['auto', 'ble', 'ha', 'esphome'];
 
 // GET /api/scale/config — read saved BT address
 app.get('/api/scale/config', (_req, res) => {
@@ -377,11 +446,29 @@ app.post('/api/scale/config', (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/scale/source — returns active scale source
+app.get('/api/scale/source', (_req, res) => {
+  res.json({ source: getConfig('scaleSource') || 'auto' });
+});
+
+// POST /api/scale/source — set preferred source
+app.post('/api/scale/source', (req, res) => {
+  const { source } = req.body ?? {};
+  if (!VALID_SOURCES.includes(source)) {
+    return res.status(400).json({ error: `source must be one of: ${VALID_SOURCES.join(', ')}` });
+  }
+  setConfig('scaleSource', source);
+  // Stop BLE if switching away from it
+  if (source !== 'ble' && source !== 'auto') scaleManager.stop();
+  res.json({ ok: true, source });
+});
+
 // GET /api/scale/stream — SSE stream of weight events
 // Events:
-//   data: {type:'status', scanning, source}
-//   data: {type:'reading', weight_kg, detergent_ml, load_level, source}  ← live, each stable notification
-//   data: {type:'weight',  weight_kg, detergent_ml, load_level, source}  ← settled final reading
+//   data: {type:'config',  source}                                        ← sent once on connect
+//   data: {type:'status',  scanning, source}                              ← BLE only
+//   data: {type:'reading', weight_kg, source}                             ← BLE live reading
+//   data: {type:'weight',  weight_kg, source}                             ← settled/final weight
 app.get('/api/scale/stream', (req, res) => {
   res.setHeader('Content-Type',  'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -393,25 +480,33 @@ app.get('/api/scale/stream', (req, res) => {
     res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
   };
 
-  // Send current status immediately
-  send('status', { scanning: scaleManager.scanning, source: scaleManager.source });
-  if (scaleManager.lastWeight !== null) {
-    const kg = scaleManager.lastWeight;
-    send('reading', { weight_kg: kg, stable: true, source: scaleManager.source });
+  const activeSource = getConfig('scaleSource') || 'auto';
+  const useBLE       = activeSource === 'ble' || activeSource === 'auto';
+
+  // First event: tell the client which source is configured
+  send('config', { source: activeSource });
+
+  // Wire up listeners — BLE (scaleManager) + webhook (scaleHA: ha/esphome)
+  const onReading  = (d) => send('reading', d);
+  const onWeight   = (d) => send('weight',  d);
+  const onStatus   = (d) => send('status',  d);
+  const onHaWeight = (d) => send('weight',  d);
+
+  if (useBLE) {
+    // Send current BLE status immediately
+    send('status', { scanning: scaleManager.scanning, source: scaleManager.source });
+    if (scaleManager.lastWeight !== null) {
+      send('reading', { weight_kg: scaleManager.lastWeight, stable: true, source: scaleManager.source });
+    }
+    scaleManager.on('reading', onReading);
+    scaleManager.on('weight',  onWeight);
+    scaleManager.on('status',  onStatus);
+    const address = getConfig('scaleAddress') || undefined;
+    scaleManager.start(address);
   }
 
-  // Wire up listeners
-  const onReading = (d) => send('reading', d);
-  const onWeight  = (d) => send('weight',  d);
-  const onStatus  = (d) => send('status',  d);
-
-  scaleManager.on('reading', onReading);
-  scaleManager.on('weight',  onWeight);
-  scaleManager.on('status',  onStatus);
-
-  // Start scanning if not already running
-  const address = getConfig('scaleAddress') || undefined;
-  scaleManager.start(address);
+  // Always listen for webhook-based weight (ha / esphome)
+  scaleHA.on('weight', onHaWeight);
 
   // Keepalive: prevents nginx and proxies from closing idle SSE connections
   const keepaliveInterval = setInterval(() => {
@@ -424,8 +519,9 @@ app.get('/api/scale/stream', (req, res) => {
     scaleManager.removeListener('reading', onReading);
     scaleManager.removeListener('weight',  onWeight);
     scaleManager.removeListener('status',  onStatus);
-    // Stop scanning only when no more SSE clients are connected
-    if (scaleManager.listenerCount('reading') === 0) {
+    scaleHA.removeListener('weight', onHaWeight);
+    // Stop BLE scanning only when no more SSE clients are connected
+    if (useBLE && scaleManager.listenerCount('reading') === 0) {
       scaleManager.stop();
     }
   });

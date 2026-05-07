@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
 
-const KG_STEP  = 0.5;
+const LB_STEP  = 1;
 
 // ── Detergent calculation logic ───────────────────────────────────────────────
 function calcDetergent(kg, preset) {
@@ -30,8 +30,10 @@ function DetergentBar({ ml, max = 150 }) {
 
 // ── Scale live-view widget ────────────────────────────────────────────────────
 function ScaleLive({ onWeight }) {
-  const [status, setStatus]   = useState('connecting'); // idle | connecting | live | settled | error
-  const [liveKg, setLiveKg]   = useState(null);
+  const [status, setStatus]         = useState('connecting');
+  const [liveLbs, setLiveLbs]       = useState(null);
+  const [hwStable, setHwStable]     = useState(true);   // false = below scale's min threshold
+  const [scaleSource, setScaleSource] = useState('auto'); // auto | ble | ha | esphome
   const esRef = useRef(null);
 
   useEffect(() => {
@@ -41,36 +43,61 @@ function ScaleLive({ onWeight }) {
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
-        if (data.type === 'status') {
+        if (data.type === 'config') {
+          setScaleSource(data.source);
+          // For webhook sources, flip from 'connecting' to 'idle' immediately
+          if (data.source !== 'ble' && data.source !== 'auto') {
+            setStatus(s => s === 'settled' ? s : 'idle');
+          }
+        } else if (data.type === 'status') {
           if (data.scanning) setStatus(s => s === 'settled' ? s : 'connecting');
         } else if (data.type === 'reading') {
-          setLiveKg(data.weight_kg);
+          setLiveLbs(data.weight_kg * 2.20462);
           setStatus('live');
         } else if (data.type === 'weight') {
-          setLiveKg(data.weight_kg);
+          const lbs = data.weight_kg * 2.20462;
+          setLiveLbs(lbs);
+          setHwStable(data.stable !== false);
           setStatus('settled');
-          onWeight(data.weight_kg);
+          onWeight(lbs);
         }
       } catch { /* ignore parse errors */ }
     };
-    es.onerror = () => setStatus('error');
+    // Only flag error for BLE sources; webhook sources tolerate SSE reconnects
+    es.onerror = () => {
+      setStatus(s => {
+        if (s === 'settled') return s;
+        return (scaleSource === 'ble') ? 'error' : 'idle';
+      });
+    };
 
     return () => { es.close(); esRef.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const statusLabel = {
-    idle:       'Esperando báscula…',
-    connecting: 'Conectando…',
-    live:       'Pesando…',
-    settled:    'Peso capturado ✓',
-    error:      'Error de conexión BLE',
-  }[status];
+  const isWebhook = scaleSource === 'ha' || scaleSource === 'esphome';
+  const sourceLabel = { ha: 'Home Assistant', esphome: 'ESPHome', ble: 'BLE', auto: 'BLE' }[scaleSource] ?? 'báscula';
+
+  const statusLabel = isWebhook
+    ? {
+        idle:     `Esperando ${sourceLabel}…`,
+        settled:  'Peso recibido ✓',
+        live:     'Recibiendo peso…',
+        error:    `Sin respuesta de ${sourceLabel}`,
+        connecting: `Esperando ${sourceLabel}…`,
+      }[status]
+    : {
+        idle:       'Esperando báscula…',
+        connecting: 'Conectando BLE…',
+        live:       'Pesando…',
+        settled:    'Peso capturado ✓',
+        error:      'Error de conexión BLE',
+      }[status];
 
   const dotColor = {
     idle:       'var(--muted)',
     connecting: 'var(--warn)',
     live:       'var(--accent)',
-    settled:    'var(--success)',
+    settled:    hwStable ? 'var(--success)' : 'var(--warn)',
     error:      'var(--danger)',
   }[status];
 
@@ -79,17 +106,25 @@ function ScaleLive({ onWeight }) {
       <div className="scale-live-header">
         <span className="scale-live-dot" style={{ background: dotColor }} />
         <span className="scale-live-status">{statusLabel}</span>
+        {scaleSource !== 'auto' && (
+          <span className="scale-live-source-badge">{sourceLabel}</span>
+        )}
       </div>
+      {status === 'settled' && !hwStable && (
+        <div className="scale-live-approx-note">
+          Peso estimado por consistencia (por debajo del mínimo de la báscula)
+        </div>
+      )}
       <div className={`scale-live-weight ${status === 'live' ? 'scale-live-pulse' : ''}`}>
-        {liveKg !== null
-          ? <><span className="scale-live-num">{liveKg.toFixed(2)}</span><span className="scale-live-unit"> kg</span></>
-          : <span className="scale-live-placeholder">— — kg</span>
+        {liveLbs !== null
+          ? <><span className="scale-live-num">{liveLbs.toFixed(1)}</span><span className="scale-live-unit"> lbs</span></>
+          : <span className="scale-live-placeholder">— — lbs</span>
         }
       </div>
-      {liveKg !== null && (
-        <span className="scale-live-lbs">{(liveKg * 2.20462).toFixed(1)} lbs · Pon la ropa en la báscula</span>
+      {liveLbs !== null && (
+        <span className="scale-live-lbs">{(liveLbs / 2.20462).toFixed(2)} kg · Pon la ropa en la báscula</span>
       )}
-      {liveKg === null && (
+      {liveLbs === null && (
         <span className="scale-live-hint">Pon la ropa en la báscula</span>
       )}
     </div>
@@ -97,23 +132,24 @@ function ScaleLive({ onWeight }) {
 }
 
 export default function ApplyModal({ preset, onConfirm, onClose }) {
-  // kg is the canonical unit internally; display in kg with +/- 0.5 kg steps
-  const [kg, setKg]       = useState(null);
+  // lbs is the display unit; kg is derived for detergent calculation
+  const [lbs, setLbs]       = useState(null);
   const [useScale, setUseScale] = useState(true);
   const careItems = (preset.clothing_items ?? []).filter(i => i.care_instructions?.trim());
 
-  const ml    = kg !== null ? calcDetergent(kg, preset) : null;
-  const valid = ml !== null && ml > 0;
+  const kg    = lbs !== null ? lbs / 2.20462 : null;
+  const ml    = kg  !== null ? calcDetergent(kg, preset) : null;
+  const valid = ml  !== null && ml > 0;
 
-  const adjust = (delta) => setKg(prev => {
-    const next = Math.round(((prev ?? 0) + delta) * 10) / 10;
-    return Math.max(0.5, Math.min(30, next));
+  const adjust = (delta) => setLbs(prev => {
+    const next = Math.round((prev ?? 0) + delta);
+    return Math.max(1, Math.min(66, next));
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!valid) return;
-    onConfirm({ lbs: +(kg * 2.20462).toFixed(1), kg, ml });
+    onConfirm({ lbs: +lbs.toFixed(1), kg: +kg.toFixed(3), ml });
   };
 
   return (
@@ -129,31 +165,31 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
           {/* ── Mode toggle ── */}
           <div className="weight-mode-tabs">
             <button type="button" className={`weight-tab ${useScale ? 'weight-tab-active' : ''}`}
-              onClick={() => setUseScale(true)}>⚖️ Báscula BLE</button>
+              onClick={() => setUseScale(true)}>⚖️ Báscula</button>
             <button type="button" className={`weight-tab ${!useScale ? 'weight-tab-active' : ''}`}
               onClick={() => setUseScale(false)}>✏️ Manual</button>
           </div>
 
           {/* ── Scale live view ── */}
           {useScale && (
-            <ScaleLive onWeight={(w) => setKg(Math.round(w * 10) / 10)} />
+            <ScaleLive onWeight={(w) => setLbs(Math.round(w))} />
           )}
 
           {/* ── Weight stepper (always visible) ── */}
           <div className="weight-stepper">
             <button type="button" className="stepper-btn stepper-minus"
-              onClick={() => adjust(-KG_STEP)} disabled={kg !== null && kg <= 0.5}>−</button>
+              onClick={() => adjust(-LB_STEP)} disabled={lbs !== null && lbs <= 1}>−</button>
             <div className="stepper-display">
-              {kg !== null
-                ? <><span className="stepper-num">{kg.toFixed(1)}</span><span className="stepper-unit">kg</span></>
-                : <span className="stepper-placeholder">— kg</span>
+              {lbs !== null
+                ? <><span className="stepper-num">{lbs.toFixed(0)}</span><span className="stepper-unit">lbs</span></>
+                : <span className="stepper-placeholder">— lbs</span>
               }
-              {kg !== null && (
-                <span className="stepper-lbs">{(kg * 2.20462).toFixed(1)} lbs</span>
+              {lbs !== null && (
+                <span className="stepper-lbs">{(lbs / 2.20462).toFixed(2)} kg</span>
               )}
             </div>
             <button type="button" className="stepper-btn stepper-plus"
-              onClick={() => adjust(+KG_STEP)}>+</button>
+              onClick={() => adjust(+LB_STEP)}>+</button>
           </div>
 
           {/* ── Detergent result ── */}

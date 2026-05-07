@@ -7,6 +7,9 @@ dist/
 # Environment variables — never commit real credentials
 .env
 
+# OAuth credentials (plaintext backup, never commit)
+.oauth
+
 # SQLite database (contains token & deviceId at runtime)
 data/
 *.db

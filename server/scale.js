@@ -30,7 +30,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const SCALE_NAME   = 'Etekcity Smart Fitness Scale';
 const NOTIFY_UUID  = 'fff1';   // noble shortens 0000fff1-0000-1000-8000-00805f9b34fb
-const SETTLE_MS    = 5_000;
+const SETTLE_MS         = 5_000;
+// If scale never reports stable=1 (weight below hw threshold), emit after
+// CONSISTENCY_MS of readings within CONSISTENCY_TOL_KG of each other.
+const CONSISTENCY_MS    = 3_000;
+const CONSISTENCY_TOL   = 0.02; // kg
 
 // ── Detergent dose calculator ─────────────────────────────────
 function calcDetergent(kg) {
@@ -54,9 +58,10 @@ function parsePayload(buf) {
   if (buf[3] !== 0x10 || buf[4] !== 0x00)          return null;
   if (buf[6] !== 0x01 || buf[7] !== 0x61 ||
       buf[8] !== 0xa1 || buf[9] !== 0x00)          return null;
-  if (buf[19] !== 1)                                return null; // not stable yet
   const raw = buf[10] | (buf[11] << 8) | (buf[12] << 16);
-  return Math.round(raw) / 1000; // kg
+  const kg  = Math.round(raw) / 1000;
+  const stable = buf[19] === 1;
+  return { kg, stable };
 }
 
 // ── Python binary location ────────────────────────────────────
@@ -77,8 +82,10 @@ class ScaleManager extends EventEmitter {
     this._noble       = null;
     this._peripheral  = null;
     this._pythonProc  = null;
-    this._settleTimer = null;
-    this._lastKg      = null;
+    this._settleTimer      = null;
+    this._lastKg          = null;
+    this._consistencyTimer = null;
+    this._consistencyKg   = null;
   }
 
   // ── Public API ──────────────────────────────────────────────
@@ -95,6 +102,7 @@ class ScaleManager extends EventEmitter {
   stop() {
     this._scanning = false;
     clearTimeout(this._settleTimer);
+    clearTimeout(this._consistencyTimer);
     this._stopNoble();
     this._stopPython();
     this.emit('status', { scanning: false, source: null });
@@ -106,23 +114,48 @@ class ScaleManager extends EventEmitter {
 
   // ── Internal: settle logic ──────────────────────────────────
 
-  _onReading(kg, source) {
+  _onReading(kg, stable, source) {
     this._lastKg = kg;
     this._source = source;
 
     // Emit live intermediate reading
-    this.emit('reading', { weight_kg: kg, ...calcDetergent(kg), stable: true, source });
+    this.emit('reading', { weight_kg: kg, ...calcDetergent(kg), stable, source });
 
-    // Reset settle timer — emit final 'weight' event SETTLE_MS after last reading
-    clearTimeout(this._settleTimer);
-    this._settleTimer = setTimeout(() => {
-      this.emit('weight', {
-        weight_kg:   this._lastKg,
-        ...calcDetergent(this._lastKg),
-        stable: true,
-        source,
-      });
-    }, SETTLE_MS);
+    if (stable) {
+      // Scale confirms stable — clear consistency timer, use settle timer
+      clearTimeout(this._consistencyTimer);
+      this._consistencyKg = null;
+      clearTimeout(this._settleTimer);
+      this._settleTimer = setTimeout(() => {
+        this.emit('weight', {
+          weight_kg: this._lastKg,
+          ...calcDetergent(this._lastKg),
+          stable: true,
+          source,
+        });
+      }, SETTLE_MS);
+    } else {
+      // Scale not stable (weight below hw threshold) — use consistency timeout:
+      // emit if reading stays within tolerance for CONSISTENCY_MS
+      if (this._consistencyKg === null ||
+          Math.abs(kg - this._consistencyKg) > CONSISTENCY_TOL) {
+        // Weight changed — reset consistency window
+        clearTimeout(this._consistencyTimer);
+        this._consistencyKg = kg;
+        this._consistencyTimer = setTimeout(() => {
+          if (Math.abs(this._lastKg - this._consistencyKg) <= CONSISTENCY_TOL) {
+            console.log(`[scale] consistency-stable at ${this._lastKg.toFixed(3)} kg (hw stable=0)`);
+            this.emit('weight', {
+              weight_kg: this._lastKg,
+              ...calcDetergent(this._lastKg),
+              stable: false, // honest: hw never confirmed stable
+              source,
+            });
+          }
+          this._consistencyKg = null;
+        }, CONSISTENCY_MS);
+      }
+    }
   }
 
   // ── Noble path ──────────────────────────────────────────────
@@ -193,8 +226,8 @@ class ScaleManager extends EventEmitter {
 
         const notifyChar = characteristics[0];
         notifyChar.on('data', (buf) => {
-          const kg = parsePayload(buf);
-          if (kg !== null) this._onReading(kg, 'noble');
+          const parsed = parsePayload(buf);
+          if (parsed !== null) this._onReading(parsed.kg, parsed.stable, 'noble');
         });
         await notifyChar.subscribeAsync();
         console.log('[scale] noble subscribed to weight notifications');
@@ -242,7 +275,8 @@ class ScaleManager extends EventEmitter {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    this._source = 'python';
+    this._source      = 'python';
+    this._pythonFails = this._pythonFails ?? 0;
     this.emit('status', { scanning: true, source: 'python' });
 
     let lineBuf = '';
@@ -256,7 +290,7 @@ class ScaleManager extends EventEmitter {
         try {
           const data = JSON.parse(trimmed);
           if (typeof data.weight_kg === 'number') {
-            this._onReading(data.weight_kg, 'python');
+            this._onReading(data.weight_kg, data.stable ?? true, 'python');
           }
         } catch (_) {
           console.warn('[scale/py] unparseable stdout:', trimmed);

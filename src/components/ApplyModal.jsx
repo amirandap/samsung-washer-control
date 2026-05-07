@@ -79,63 +79,65 @@ export default function ApplyModal({ preset, onConfirm, onClose }) {
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal modal-sm" role="dialog" aria-modal="true">
-        <div className="modal-header">
-          <h3>⚙️ <span style={{ color: preset.color }}>{preset.name}</span></h3>
-          <button className="btn btn-icon" onClick={onClose}>✕</button>
-        </div>
+        <form onSubmit={handleSubmit} className="modal-form">
+          <div className="modal-header">
+            <h3>⚙️ <span style={{ color: preset.color }}>{preset.name}</span></h3>
+            <button type="button" className="btn btn-icon" onClick={onClose}>✕</button>
+          </div>
 
-        <form onSubmit={handleSubmit} className="modal-body">
+          <div className="modal-body">
 
-          <div className={`weight-source-row ${weightInfo ? (isFresh ? 'weight-fresh' : 'weight-stale') : 'weight-none'}`}>
-            <span className="weight-source-dot" />
-            {weightInfo ? (
-              <>
-                <span className="weight-source-val">{weightInfo.lbs.toFixed(1)} lbs</span>
-                <span className="weight-source-meta">
-                  {(weightInfo.lbs / 2.20462).toFixed(2)} kg · {timeAgo(weightInfo.receivedAt)}
-                  {!isFresh && <span className="weight-source-stale-note"> — desactualizado</span>}
-                </span>
-              </>
-            ) : (
-              <span className="weight-source-meta">Sin peso registrado</span>
+            <div className={`weight-source-row ${weightInfo ? (isFresh ? 'weight-fresh' : 'weight-stale') : 'weight-none'}`}>
+              <span className="weight-source-dot" />
+              {weightInfo ? (
+                <>
+                  <span className="weight-source-val">{weightInfo.lbs.toFixed(1)} lbs</span>
+                  <span className="weight-source-meta">
+                    {(weightInfo.lbs / 2.20462).toFixed(2)} kg · {timeAgo(weightInfo.receivedAt)}
+                    {!isFresh && <span className="weight-source-stale-note"> — desactualizado</span>}
+                  </span>
+                </>
+              ) : (
+                <span className="weight-source-meta">Sin peso registrado</span>
+              )}
+            </div>
+
+            <div className="weight-stepper">
+              <button type="button" className="stepper-btn stepper-minus" onClick={() => adjust(-LB_STEP)}>−</button>
+              <div className="stepper-display">
+                {lbs !== null
+                  ? <><span className="stepper-num">{lbs.toFixed(0)}</span><span className="stepper-unit">lbs</span></>
+                  : <span className="stepper-placeholder">— lbs</span>
+                }
+                {lbs !== null && <span className="stepper-lbs">{(lbs / 2.20462).toFixed(2)} kg</span>}
+              </div>
+              <button type="button" className="stepper-btn stepper-plus" onClick={() => adjust(+LB_STEP)}>+</button>
+            </div>
+
+            {valid && (
+              <div className="det-result">
+                <div className="det-ml-display">
+                  <span className="det-ml-num">{ml}</span>
+                  <span className="det-ml-unit">ml</span>
+                </div>
+                <div className="det-ml-label">{detergent.emoji} {detergent.label}</div>
+              </div>
+            )}
+
+            {careItems.length > 0 && (
+              <div className="care-instructions-block">
+                <div className="care-instructions-title">⚠️ Instrucciones de cuidado</div>
+                <ul className="care-instructions-list">
+                  {careItems.map(item => (
+                    <li key={item.id}>
+                      <span className="care-item-name">{item.brand} {item.name}</span>
+                      <span className="care-item-note">{item.care_instructions}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
-
-          <div className="weight-stepper">
-            <button type="button" className="stepper-btn stepper-minus" onClick={() => adjust(-LB_STEP)}>−</button>
-            <div className="stepper-display">
-              {lbs !== null
-                ? <><span className="stepper-num">{lbs.toFixed(0)}</span><span className="stepper-unit">lbs</span></>
-                : <span className="stepper-placeholder">— lbs</span>
-              }
-              {lbs !== null && <span className="stepper-lbs">{(lbs / 2.20462).toFixed(2)} kg</span>}
-            </div>
-            <button type="button" className="stepper-btn stepper-plus" onClick={() => adjust(+LB_STEP)}>+</button>
-          </div>
-
-          {valid && (
-            <div className="det-result">
-              <div className="det-ml-display">
-                <span className="det-ml-num">{ml}</span>
-                <span className="det-ml-unit">ml</span>
-              </div>
-              <div className="det-ml-label">{detergent.emoji} {detergent.label}</div>
-            </div>
-          )}
-
-          {careItems.length > 0 && (
-            <div className="care-instructions-block">
-              <div className="care-instructions-title">⚠️ Instrucciones de cuidado</div>
-              <ul className="care-instructions-list">
-                {careItems.map(item => (
-                  <li key={item.id}>
-                    <span className="care-item-name">{item.brand} {item.name}</span>
-                    <span className="care-item-note">{item.care_instructions}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           <div className="modal-footer">
             <button type="submit" className="btn btn-primary w-full" disabled={!valid}>

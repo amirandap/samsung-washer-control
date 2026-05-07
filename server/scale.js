@@ -25,8 +25,20 @@ import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Detect noble package availability at load time — avoids runtime import attempts
+// when BLE is not installed or not needed.
+const _require = createRequire(import.meta.url);
+let NOBLE_AVAILABLE = false;
+try {
+  _require.resolve('@stoprocent/noble');
+  NOBLE_AVAILABLE = true;
+} catch (_) {
+  console.log('[scale] @stoprocent/noble not installed — noble path disabled');
+}
 
 const SCALE_NAME   = 'Etekcity Smart Fitness Scale';
 const NOTIFY_UUID  = 'fff1';   // noble shortens 0000fff1-0000-1000-8000-00805f9b34fb
@@ -78,7 +90,7 @@ class ScaleManager extends EventEmitter {
     this._address     = null;
     this._scanning    = false;
     this._source      = null;     // 'noble' | 'python'
-    this._nobleFailed = false;
+    this._nobleFailed = !NOBLE_AVAILABLE; // skip noble immediately if not installed
     this._noble       = null;
     this._peripheral  = null;
     this._pythonProc  = null;
@@ -86,12 +98,28 @@ class ScaleManager extends EventEmitter {
     this._lastKg          = null;
     this._consistencyTimer = null;
     this._consistencyKg   = null;
+    this._bleDisabled     = false; // set to true when source is ha/esphome
   }
 
   // ── Public API ──────────────────────────────────────────────
 
+  /**
+   * Disable BLE entirely — called when scaleSource is 'ha' or 'esphome'.
+   * Makes start() a no-op so no BLE or Python attempts are made.
+   */
+  disable() {
+    this._bleDisabled = true;
+    this.stop();
+  }
+
+  /** Enable BLE — called if source switches back to 'ble' or 'auto'. */
+  enable() {
+    this._bleDisabled = false;
+  }
+
   /** Start scanning. Safe to call multiple times. */
   start(address) {
+    if (this._bleDisabled) return;
     if (this._scanning) return;
     this._address  = address;
     this._scanning = true;
@@ -161,12 +189,10 @@ class ScaleManager extends EventEmitter {
   // ── Noble path ──────────────────────────────────────────────
 
   async _tryNoble() {
-    if (this._nobleFailed) {
+    if (!NOBLE_AVAILABLE || this._nobleFailed) {
       this._startPython();
       return;
     }
-
-    console.log('[scale] trying noble (Node.js native BLE)...');
     try {
       const { withBindings } = await import('@stoprocent/noble');
       const noble = withBindings('default');

@@ -478,8 +478,11 @@ app.post('/api/scale/source', (req, res) => {
     return res.status(400).json({ error: `source must be one of: ${VALID_SOURCES.join(', ')}` });
   }
   setConfig('scaleSource', source);
-  // Stop BLE if switching away from it
-  if (source !== 'ble' && source !== 'auto') scaleManager.stop();
+  if (source === 'ble' || source === 'auto') {
+    scaleManager.enable();
+  } else {
+    scaleManager.disable();
+  }
   res.json({ ok: true, source });
 });
 
@@ -560,6 +563,12 @@ app.get('*', (_req, res) => {
 app.listen(PORT, async () => {
   console.log(`[washer-api] listening on http://localhost:${PORT}`);
 
+  // Disable BLE scanner if source is ha/esphome — avoids spurious noble/Python attempts
+  const startupSource = getConfig('scaleSource') || 'auto';
+  if (startupSource !== 'ble' && startupSource !== 'auto') {
+    scaleManager.disable();
+    console.log(`[scale] BLE disabled at startup (source=${startupSource})`);
+  }
   // Auto-discover device if token is available but deviceId is not saved yet
   const token    = getConfig('token');
   const deviceId = getConfig('deviceId');

@@ -583,6 +583,19 @@ input[type="color"] { padding: 3px; height: 40px; width: 40px; cursor: pointer; 
 .preset-sending { opacity: .55; pointer-events: none; }
 
 .preset-header { display: flex; align-items: center; gap: var(--sp-2); }
+.preset-header-end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.preset-meta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 20px;
+}
 .preset-badge-dot {
   width: 12px; height: 12px;
   border-radius: 50%;
@@ -598,6 +611,11 @@ input[type="color"] { padding: 3px; height: 40px; width: 40px; cursor: pointer; 
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+@media (min-width: 600px) {
+  .preset-name { font-size: var(--fs-lg); }
 }
 @media (min-width: 600px) {
   .preset-name { font-size: var(--fs-lg); }
@@ -665,12 +683,6 @@ input[type="color"] { padding: 3px; height: 40px; width: 40px; cursor: pointer; 
   gap: 3px;
   flex: 1;
 }
-.preset-clothes-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-}
 .preset-clothes-brand {
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -678,20 +690,12 @@ input[type="color"] { padding: 3px; height: 40px; width: 40px; cursor: pointer; 
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 1;
-  min-width: 0;
-}
-.preset-clothes-type {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 .item-color-dots {
   display: flex;
   gap: 3px;
+  align-items: center;
   flex-shrink: 0;
-  margin-left: auto;
 }
 .item-color-dot {
   width: 9px;

@@ -1,30 +1,20 @@
 import { parseCompatColors, COLOR_SWATCHES } from '../constants.js';
 
-const MAX_VISIBLE = 4;
-
+const MAX_VISIBLE = 5;
 const colorHex = Object.fromEntries(COLOR_SWATCHES.map(c => [c.value, c.hex]));
-
-function ColorDots({ raw }) {
-  const colors = parseCompatColors(raw).slice(0, 5);
-  if (!colors.length) return null;
-  return (
-    <span className="item-color-dots">
-      {colors.map(c => (
-        <span
-          key={c}
-          className="item-color-dot"
-          style={{ background: colorHex[c] ?? c, border: c === 'blanco' ? '1px solid #ccc' : 'none' }}
-          title={c}
-        />
-      ))}
-    </span>
-  );
-}
 
 export default function PresetCard({ preset, isApplying, onApply, onEdit, onDelete }) {
   const clothing = preset.clothing_items ?? [];
-  const visible  = clothing.slice(0, MAX_VISIBLE);
-  const overflow = clothing.length - MAX_VISIBLE;
+
+  // Unique brands
+  const brands  = [...new Set(clothing.map(i => i.brand).filter(Boolean))];
+  const visible = brands.slice(0, MAX_VISIBLE);
+  const overflow = brands.length - MAX_VISIBLE;
+
+  // Aggregate unique colors from all items
+  const allColors = [...new Set(
+    clothing.flatMap(i => parseCompatColors(i.colors))
+  )].slice(0, 6);
 
   return (
     <div
@@ -33,9 +23,26 @@ export default function PresetCard({ preset, isApplying, onApply, onEdit, onDele
     >
       <div className="preset-accent" />
 
+      {/* Name row */}
       <div className="preset-header">
         <span className="preset-badge-dot" style={{ background: preset.color }} />
         <div className="preset-name">{preset.name}</div>
+      </div>
+
+      {/* Colors + edit/delete row */}
+      <div className="preset-meta-row">
+        {allColors.length > 0 && (
+          <span className="item-color-dots">
+            {allColors.map(c => (
+              <span
+                key={c}
+                className="item-color-dot"
+                style={{ background: colorHex[c] ?? c, border: c === 'blanco' ? '1px solid #ccc' : 'none' }}
+                title={c}
+              />
+            ))}
+          </span>
+        )}
         <div className="preset-actions">
           <button
             className="btn btn-icon"
@@ -50,14 +57,10 @@ export default function PresetCard({ preset, isApplying, onApply, onEdit, onDele
         </div>
       </div>
 
-      {clothing.length > 0 ? (
+      {brands.length > 0 ? (
         <div className="preset-clothes-list">
-          {visible.map((item, i) => (
-            <div key={item.id ?? i} className="preset-clothes-row">
-              <span className="preset-clothes-brand">{item.brand || item.name}</span>
-              {item.item_type && <span className="preset-clothes-type">{item.item_type}</span>}
-              <ColorDots raw={item.colors} />
-            </div>
+          {visible.map((brand, i) => (
+            <span key={i} className="preset-clothes-brand">{brand}</span>
           ))}
           {overflow > 0 && (
             <span className="preset-clothes-more">+{overflow} más</span>

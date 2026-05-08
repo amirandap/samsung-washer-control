@@ -1,10 +1,12 @@
-import { COLOR_SWATCHES, parseCompatColors } from '../constants.js';
+import { parseCompatColors } from '../constants.js';
+
+const MAX_VISIBLE = 4;
 
 export default function PresetCard({ preset, isApplying, onApply, onEdit, onDelete }) {
-  const compatColors = parseCompatColors(preset.compat_colors);
   const clothing  = preset.clothing_items ?? [];
-  const brands    = [...new Set(clothing.map(i => i.brand).filter(Boolean))];
-  const itemTypes = [...new Set(clothing.map(i => i.item_type).filter(Boolean))];
+  const names     = clothing.map(i => [i.brand, i.name].filter(Boolean).join(' ')).filter(Boolean);
+  const visible   = names.slice(0, MAX_VISIBLE);
+  const overflow  = names.length - MAX_VISIBLE;
 
   return (
     <div
@@ -17,6 +19,7 @@ export default function PresetCard({ preset, isApplying, onApply, onEdit, onDele
         <span className="preset-badge-dot" style={{ background: preset.color }} />
         <div className="preset-name-group">
           <div className="preset-name">{preset.name}</div>
+          {preset.subtitle && <div className="preset-sub">{preset.subtitle}</div>}
         </div>
         <div className="preset-actions">
           <button
@@ -32,45 +35,18 @@ export default function PresetCard({ preset, isApplying, onApply, onEdit, onDele
         </div>
       </div>
 
-      <div className="preset-quick-info">
-        <div className="quick-info-row">
-          <span className="qi-label">Marcas</span>
-          <span className="qi-value">
-            {brands.length > 0
-              ? brands.join(', ')
-              : <span className="qi-empty">—</span>}
-          </span>
+      {names.length > 0 ? (
+        <div className="preset-clothes-list">
+          {visible.map((n, i) => (
+            <span key={i} className="preset-clothes-name">{n}</span>
+          ))}
+          {overflow > 0 && (
+            <span className="preset-clothes-more">+{overflow} más</span>
+          )}
         </div>
-
-        <div className="quick-info-row">
-          <span className="qi-label">Colores</span>
-          <span className="qi-value qi-colors">
-            {compatColors.length > 0
-              ? compatColors.map(v => {
-                  const sw = COLOR_SWATCHES.find(s => s.value === v);
-                  if (!sw) return null;
-                  return (
-                    <span key={v} className="compat-dot-wrap" title={sw.label}>
-                      <span className="compat-dot" style={{ background: sw.hex, border: `2px solid ${sw.border}` }} />
-                      <span className="compat-dot-label">{sw.label}</span>
-                    </span>
-                  );
-                })
-              : <span className="qi-empty">—</span>}
-          </span>
-        </div>
-
-        <div className="quick-info-row">
-          <span className="qi-label">Tipo</span>
-          <span className="qi-value">
-            {itemTypes.length > 0
-              ? itemTypes.join(', ')
-              : <span className="qi-empty">—</span>}
-          </span>
-        </div>
-      </div>
-
-      {preset.notes && <div className="preset-notes">{preset.notes}</div>}
+      ) : (
+        <div className="preset-clothes-empty">Sin prendas asignadas</div>
+      )}
 
       <button
         className="btn btn-apply"
@@ -78,10 +54,9 @@ export default function PresetCard({ preset, isApplying, onApply, onEdit, onDele
         onClick={() => onApply(preset)}
         style={{ '--apply-color': preset.color }}
       >
-        {isApplying
-          ? <><span className="spinner" /> Enviando…</>
-          : 'Aplicar preset'}
+        {isApplying ? <><span className="spinner" /> Enviando…</> : 'Lavar'}
       </button>
     </div>
   );
 }
+

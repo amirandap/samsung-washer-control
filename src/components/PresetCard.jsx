@@ -93,7 +93,6 @@ export default function PresetCard({ preset, isApplying, onApply }) {
       <div className="preset-accent" />
 
       <div className="preset-header">
-        <span className="preset-badge-dot" style={{ background: preset.color }} />
         <div className="preset-name">{preset.name}</div>
         {allColors.length > 0 && (
           <div className="item-color-dots">

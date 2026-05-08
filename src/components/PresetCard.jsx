@@ -2,7 +2,7 @@ import { parseCompatColors, COLOR_SWATCHES } from '../constants.js';
 
 const colorHex = Object.fromEntries(COLOR_SWATCHES.map(c => [c.value, c.hex]));
 const MAX_BRANDS = 5;
-const ICON_SZ = 13;
+const ICON_SZ = 18;
 
 // ── Clothing type SVG icons ───────────────────────────────────────────────────
 const ShirtIcon = () => (
@@ -95,20 +95,19 @@ export default function PresetCard({ preset, isApplying, onApply }) {
       <div className="preset-header">
         <span className="preset-badge-dot" style={{ background: preset.color }} />
         <div className="preset-name">{preset.name}</div>
+        {allColors.length > 0 && (
+          <div className="item-color-dots">
+            {allColors.map(c => (
+              <span
+                key={c}
+                className="item-color-dot"
+                style={{ background: colorHex[c] ?? c, border: c === 'blanco' ? '1px solid #ccc' : 'none' }}
+                title={c}
+              />
+            ))}
+          </div>
+        )}
       </div>
-
-      {allColors.length > 0 && (
-        <div className="item-color-dots">
-          {allColors.map(c => (
-            <span
-              key={c}
-              className="item-color-dot"
-              style={{ background: colorHex[c] ?? c, border: c === 'blanco' ? '1px solid #ccc' : 'none' }}
-              title={c}
-            />
-          ))}
-        </div>
-      )}
 
       {allBrands.length > 0 ? (
         <div className="preset-clothes-list">

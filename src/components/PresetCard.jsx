@@ -1,12 +1,30 @@
-import { parseCompatColors } from '../constants.js';
+import { parseCompatColors, COLOR_SWATCHES } from '../constants.js';
 
 const MAX_VISIBLE = 4;
 
+const colorHex = Object.fromEntries(COLOR_SWATCHES.map(c => [c.value, c.hex]));
+
+function ColorDots({ raw }) {
+  const colors = parseCompatColors(raw).slice(0, 5);
+  if (!colors.length) return null;
+  return (
+    <span className="item-color-dots">
+      {colors.map(c => (
+        <span
+          key={c}
+          className="item-color-dot"
+          style={{ background: colorHex[c] ?? c, border: c === 'blanco' ? '1px solid #ccc' : 'none' }}
+          title={c}
+        />
+      ))}
+    </span>
+  );
+}
+
 export default function PresetCard({ preset, isApplying, onApply, onEdit, onDelete }) {
-  const clothing  = preset.clothing_items ?? [];
-  const names     = clothing.map(i => [i.brand, i.name].filter(Boolean).join(' ')).filter(Boolean);
-  const visible   = names.slice(0, MAX_VISIBLE);
-  const overflow  = names.length - MAX_VISIBLE;
+  const clothing = preset.clothing_items ?? [];
+  const visible  = clothing.slice(0, MAX_VISIBLE);
+  const overflow = clothing.length - MAX_VISIBLE;
 
   return (
     <div
@@ -17,10 +35,7 @@ export default function PresetCard({ preset, isApplying, onApply, onEdit, onDele
 
       <div className="preset-header">
         <span className="preset-badge-dot" style={{ background: preset.color }} />
-        <div className="preset-name-group">
-          <div className="preset-name">{preset.name}</div>
-          {preset.subtitle && <div className="preset-sub">{preset.subtitle}</div>}
-        </div>
+        <div className="preset-name">{preset.name}</div>
         <div className="preset-actions">
           <button
             className="btn btn-icon"
@@ -35,10 +50,14 @@ export default function PresetCard({ preset, isApplying, onApply, onEdit, onDele
         </div>
       </div>
 
-      {names.length > 0 ? (
+      {clothing.length > 0 ? (
         <div className="preset-clothes-list">
-          {visible.map((n, i) => (
-            <span key={i} className="preset-clothes-name">{n}</span>
+          {visible.map((item, i) => (
+            <div key={item.id ?? i} className="preset-clothes-row">
+              <span className="preset-clothes-brand">{item.brand || item.name}</span>
+              {item.item_type && <span className="preset-clothes-type">{item.item_type}</span>}
+              <ColorDots raw={item.colors} />
+            </div>
           ))}
           {overflow > 0 && (
             <span className="preset-clothes-more">+{overflow} más</span>

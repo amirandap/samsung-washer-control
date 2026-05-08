@@ -68,6 +68,7 @@ db.exec(`
 
 try { db.exec(`ALTER TABLE clothing_items ADD COLUMN item_type TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
 try { db.exec(`ALTER TABLE clothing_items ADD COLUMN care_instructions TEXT NOT NULL DEFAULT ''`); } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE clothing_items ADD COLUMN logo_url TEXT`); } catch (_) { /* already exists */ }
 
 // ── Seed default presets if table is empty ─────────────────────
 const count = db.prepare('SELECT COUNT(*) as n FROM presets').get();
@@ -319,7 +320,8 @@ const presetsWithClothingQuery = db.prepare(`
         'care_cycle',        c.care_cycle,
         'care_instructions', c.care_instructions,
         'preset_id',         c.preset_id,
-        'notes',             c.notes
+        'notes',             c.notes,
+        'logo_url',          c.logo_url
       ) END
     ) FILTER (WHERE c.id IS NOT NULL), '[]') AS clothing_items
   FROM presets p

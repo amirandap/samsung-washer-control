@@ -621,21 +621,6 @@ input[type="color"] { padding: 3px; height: 40px; width: 40px; cursor: pointer; 
   .preset-name { font-size: var(--fs-lg); }
 }
 .preset-sub  { font-size: var(--fs-xs); color: var(--muted); }
-.preset-actions {
-  display: none; /* hidden on mobile */
-  gap: 0;
-  flex-shrink: 0;
-  opacity: .55;
-  transition: opacity .15s;
-}
-@media (hover: hover) and (pointer: fine) {
-  /* desktop / trackpad devices: show on hover */
-  .preset-actions { display: flex; }
-  .preset-card:hover .preset-actions,
-  .preset-actions:focus-within { opacity: 1; }
-}
-
-/* Quick info block (Marcas / Colores / Tipo) */
 .preset-quick-info {
   display: flex;
   flex-direction: column;
@@ -680,8 +665,35 @@ input[type="color"] { padding: 3px; height: 40px; width: 40px; cursor: pointer; 
 .preset-clothes-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   flex: 1;
+}
+.preset-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.brand-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: var(--surface3);
+}
+.brand-logo-placeholder {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--surface3);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .preset-clothes-brand {
   font-size: var(--fs-sm);
@@ -690,6 +702,15 @@ input[type="color"] { padding: 3px; height: 40px; width: 40px; cursor: pointer; 
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.brand-type-icons {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  color: var(--muted);
+  flex-shrink: 0;
 }
 .item-color-dots {
   display: flex;

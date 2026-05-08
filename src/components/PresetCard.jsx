@@ -2,7 +2,7 @@ import { parseCompatColors, COLOR_SWATCHES } from '../constants.js';
 
 const colorHex = Object.fromEntries(COLOR_SWATCHES.map(c => [c.value, c.hex]));
 const MAX_BRANDS = 5;
-const ICON_SZ = 18;
+const ICON_SZ = 23;
 
 // ── Clothing type SVG icons ───────────────────────────────────────────────────
 const ShirtIcon = () => (

@@ -27,6 +27,7 @@ import {
   discoverWasherDevice, getDeviceStatus, getRemoteControlStatus,
   discoverSpinLevels, applyPreset as stApplyPreset,
 } from './smartthings.js';
+import { getValidToken, callWithRefresh } from './oauth.js';
 
 const server = new McpServer({
   name:    'washer-control',
@@ -39,7 +40,7 @@ function text(content) {
 }
 
 function requireCreds() {
-  const token    = getConfig('token');
+  const token    = getValidToken();
   const deviceId = getConfig('deviceId');
   if (!token || !deviceId) throw new Error('No token or deviceId configured. Use set_config first.');
   return { token, deviceId };
@@ -167,9 +168,9 @@ server.tool(
   'Auto-discover the washer device from the SmartThings account',
   { token: z.string().optional().describe('Token (uses stored one if omitted)') },
   async ({ token: inputToken }) => {
-    const token = inputToken ?? getConfig('token');
+    const token = inputToken ?? getValidToken();
     if (!token) return text('No token available. Use set_config first.');
-    const device = await discoverWasherDevice(token);
+    const device = await callWithRefresh(t => discoverWasherDevice(t ?? token));
     if (!device) return text('No washer device found in this SmartThings account.');
     setConfig('token',    token);
     setConfig('deviceId', device.deviceId);
@@ -186,8 +187,8 @@ server.tool(
   'Get the current real-time status of the washer from SmartThings',
   {},
   async () => {
-    const { token, deviceId } = requireCreds();
-    const status = await getDeviceStatus(token, deviceId);
+    const { deviceId } = requireCreds();
+    const status = await callWithRefresh(token => getDeviceStatus(token, deviceId));
     const main   = status?.components?.main ?? {};
 
     // Parse into a readable summary
@@ -214,8 +215,8 @@ server.tool(
   'Discover the supported spin level values for this specific washer firmware',
   {},
   async () => {
-    const { token, deviceId } = requireCreds();
-    const levels = await discoverSpinLevels(token, deviceId);
+    const { deviceId } = requireCreds();
+    const levels = await callWithRefresh(token => discoverSpinLevels(token, deviceId));
     return text({ supportedSpinLevels: levels ?? 'Could not determine — use standard values: rinseHold, low, medium, high, extraHigh' });
   }
 );
@@ -228,17 +229,17 @@ server.tool(
   'Send a preset\'s wash settings to the washer. User must press Start physically.',
   { id: z.string().describe('Preset ID to apply') },
   async ({ id }) => {
-    const { token, deviceId } = requireCreds();
+    const { deviceId } = requireCreds();
     const preset = getPreset(id);
     if (!preset) return text(`Preset "${id}" not found.`);
 
-    const remoteEnabled = await getRemoteControlStatus(token, deviceId);
+    const remoteEnabled = await callWithRefresh(token => getRemoteControlStatus(token, deviceId));
     if (!remoteEnabled) {
       return text('⚠️ Smart Control is not enabled on the washer. Ask the user to activate it in the SmartThings app or on the machine panel, then try again.');
     }
 
-    const spinLevels = await discoverSpinLevels(token, deviceId).catch(() => null);
-    const result     = await stApplyPreset(token, deviceId, preset, spinLevels);
+    const spinLevels = await callWithRefresh(token => discoverSpinLevels(token, deviceId)).catch(() => null);
+    const result     = await callWithRefresh(token => stApplyPreset(token, deviceId, preset, spinLevels));
 
     recordHistory(preset.id, preset.name);
     return text(`✅ Preset "${preset.name}" applied (cycle=${preset.cycle}, temp=${preset.temp}, spin=${result.spinCmd}). User must press START on the washer.`);

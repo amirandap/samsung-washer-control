@@ -1,5 +1,8 @@
 # --- build stage: compila el frontend (dist/ no se commitea, ver .gitignore) ---
 FROM node:20-bookworm-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ libbluetooth-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps

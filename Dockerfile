@@ -2,7 +2,7 @@
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 COPY . .
 RUN VITE_BASE_PATH=/lavadora/ npm run build
 

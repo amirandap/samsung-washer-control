@@ -19,8 +19,4 @@ jobs:
             set -e
             cd /opt/samsung-washer-control
             git pull origin main
-            npm install --omit=dev
-            npm install --include=dev
-            npm run build
-            pm2 restart washer-api
-            pm2 restart washer-mcp
+            ./docker-run.sh

@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm pkg delete scripts.prepare && npm ci --legacy-peer-deps
 COPY . .
 RUN VITE_BASE_PATH=/lavadora/ npm run build
 
@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev --legacy-peer-deps
+RUN npm pkg delete scripts.prepare && npm ci --omit=dev --legacy-peer-deps
 
 COPY server ./server
 COPY --from=build /app/dist ./dist

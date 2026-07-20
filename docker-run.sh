@@ -8,6 +8,17 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Serializa deploys en el droplet compartido -- GitHub Actions' cancel-in-progress mata el
+# job del runner pero no el proceso SSH remoto ya en marcha (appleboy/ssh-action no lo
+# propaga). Ver incidente vivaldi_webai 2026-07-20. El lock espera hasta 10 min al deploy
+# anterior en vez de competir con el.
+LOCK_FILE="/tmp/samsung-washer-control-deploy.lock"
+exec 200>"$LOCK_FILE"
+if ! flock -w 600 200; then
+  echo "ERROR: otro deploy sigue corriendo despues de esperar 10 min, abortando"
+  exit 1
+fi
+
 docker build -t washer-control:latest .
 
 docker stop washer-control 2>/dev/null || true

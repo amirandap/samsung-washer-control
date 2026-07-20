@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
 
+# One deploy per ref at a time -- avoid overlapping SSH deploy runs.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
